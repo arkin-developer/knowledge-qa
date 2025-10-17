@@ -42,7 +42,7 @@ class TextProcessor:
                     str(persist_dir),
                     self.embeddings,
                     allow_dangerous_deserialization=True,
-                    index_name="index.faiss")
+                    index_name="index")
                 log.info(f"加载现有的向量存储: {persist_dir}")
             else:
                 log.info("未找到现有向量存储，将在首次添加文档时创建")
@@ -104,7 +104,7 @@ class TextProcessor:
             persist_dir = Path(settings.vector_store_path)
             persist_dir.mkdir(parents=True, exist_ok=True)
             self.vector_store.save_local(
-                str(persist_dir), index_name="index.faiss")
+                str(persist_dir), index_name="index")
             log.info(f"向量存储已保存到: {persist_dir}")
         except Exception as e:
             log.error(f"保存向量存储失败: {e}")
