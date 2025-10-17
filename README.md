@@ -4,6 +4,12 @@
 
 ![image-20251018004817302](https://mr-lai.oss-cn-zhangjiakou.aliyuncs.com/macminim4macminim4image-20251018004817302.png)
 
+## 🌐 在线体验
+
+**[🚀 点击体验 DEMO](http://8.138.89.183:8501/)**
+
+> 💡 点击上方链接即可在线体验知识库问答系统的完整功能！
+
 ## 🛠️ 技术栈
 
 - **框架**: LangGraph (工作流编排)
