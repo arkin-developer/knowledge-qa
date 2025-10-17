@@ -51,6 +51,12 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
+# 自动设置 LangSmith 环境变量
+import os
+os.environ['LANGCHAIN_TRACING_V2'] = settings.langchain_tracing_v2
+os.environ['LANGCHAIN_API_KEY'] = settings.langsmith_api_key
+os.environ['LANGCHAIN_PROJECT'] = settings.langsmith_project
+
 if __name__ == "__main__":
     # 测试命令，根目录路径运行：uv run python -m src.knowledge_qa.config
     print(settings)
