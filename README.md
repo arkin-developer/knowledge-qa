@@ -8,7 +8,7 @@
 - **向量数据库**: FAISS (向量存储与检索)
 - **大语言模型**: Qwen/Qwen3-VL-30B-A3B-Instruct
 - **嵌入模型**: Qwen/Qwen3-Embedding-8B
-- **Web界面**: Streamlit
+- **Web 界面**: Streamlit
 - **命令行界面**: Rich
 - **日志系统**: Loguru
 - **包管理**: UV
@@ -27,36 +27,42 @@
 #### 方法一：Docker 部署 (推荐)
 
 1. **克隆项目**
+
 ```bash
 git clone https://github.com/arkin-developer/knowledge-qa.git
 cd knowledge-qa
 ```
 
 2. **一键部署**
+
 ```bash
 chmod +x init.sh
 ./init.sh
 ```
 
 3. **访问应用**
+
 - Web 界面: http://localhost:8501
 - 详细部署说明请参考 [DEPLOYMENT.md](DEPLOYMENT.md)
 
 #### 方法二：本地开发部署
 
 1. **克隆项目**
+
 ```bash
 git clone https://github.com/arkin-developer/knowledge-qa.git
 cd knowledge-qa
 ```
 
 2. **安装依赖**
+
 ```bash
 uv sync
 ```
 
 3. **配置环境变量**
-创建 `.env` 文件并配置以下参数：
+   创建 `.env` 文件并配置以下参数：
+
 ```env
 # SiliconCloud 配置
 SILICONCLOUD_API_KEY=your_api_key
@@ -98,16 +104,19 @@ LOG_LEVEL=INFO
 ### 1. 命令行界面 (CLI)
 
 **方法一：使用启动脚本（推荐）**
+
 ```bash
 uv run python start_cli.py
 ```
 
 **方法二：直接启动**
+
 ```bash
 uv run python -m src.knowledge_qa.cli
 ```
 
 CLI 功能菜单：
+
 - `1` - 上传文档到知识库
 - `2` - 查看聊天记录上下文
 - `3` - 查看目前向量存储的数量
@@ -119,6 +128,7 @@ CLI 功能菜单：
 ### 2. Web 界面 (Streamlit)
 
 **方法一：使用启动脚本（推荐）**
+
 ```bash
 # 使用默认端口 8501
 uv run python start_web.py
@@ -128,13 +138,12 @@ uv run python start_web.py 8502
 ```
 
 **方法二：直接启动**
+
 ```bash
 uv run streamlit run src/knowledge_qa/app.py --server.port 8501
 ```
 
 访问 http://localhost:8501 使用 Web 界面。
-
-
 
 ## 📁 项目结构
 
@@ -176,22 +185,23 @@ knowledge-qa/
 ## 🧪 测试
 
 运行完整测试：
+
 ```bash
 uv run python -m src.knowledge_qa.agent
 ```
 
 测试 LLM 功能：
+
 ```bash
 uv run python -m src.knowledge_qa.llm
 ```
 
 测试文本处理：
+
 ```bash
 uv run python -m src.knowledge_qa.text_processor
 
 ```
-
-
 
 ## 📄 许可证
 
