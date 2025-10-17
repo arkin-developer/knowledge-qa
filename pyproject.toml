@@ -15,5 +15,7 @@ dependencies = [
     "loguru>=0.7.3",
     "markdown>=3.9",
     "pydantic-settings>=2.11.0",
+    "rich>=14.2.0",
+    "streamlit>=1.50.0",
     "unstructured>=0.18.15",
 ]
