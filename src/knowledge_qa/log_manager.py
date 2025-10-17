@@ -1,15 +1,17 @@
 """全局日志管理"""
 
+import os
+from datetime import datetime
 from typing import Optional
 from loguru import logger
 
-import os
-from datetime import datetime
+
+from .config import settings
 
 
 def _setup_logger(level: Optional[str] = None) -> None:
     logger.remove()
-    log_level = (level or os.getenv("LOG_LEVEL", "INFO")).upper()
+    log_level = (level or settings.log_level or "INFO").upper()
 
     logger.add(
         sink=lambda msg: print(msg, end=""),

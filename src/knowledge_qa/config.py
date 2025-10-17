@@ -44,8 +44,8 @@ class Settings(BaseSettings):
         case_sensitive = False
         extra = "ignore"
 
+settings = Settings()
 
 if __name__ == "__main__":
     # 测试命令，根目录路径运行：uv run python -m src.knowledge_qa.config
-    settings = Settings()
     print(settings)
