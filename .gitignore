@@ -22,3 +22,6 @@ wheels/
 data/
 *.db
 *.sqlite
+
+# Logs
+logs/
