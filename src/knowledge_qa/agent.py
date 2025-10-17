@@ -41,20 +41,20 @@ class KnowledgeQAAgent:
     def _build_graph(self) -> StateGraph:
         """构建工作流图"""
         workflow = StateGraph(KnowledgeQAState)
-        
+
         # 添加核心节点
         workflow.add_node("process_file", self._process_file_node)
         workflow.add_node("store_document", self._store_document_node)
         workflow.add_node("retrieve_context", self._retrieve_context_node)
         workflow.add_node("generate_answer", self._generate_answer_node)
         workflow.add_node("handle_error", self._handle_error_node)
-        
+
         # 设置边连接
         workflow.add_edge("process_file", "store_document")
         workflow.add_edge("retrieve_context", "generate_answer")
         workflow.add_edge("generate_answer", END)
         workflow.add_edge("handle_error", END)
-        
+
         # 文档存储后的条件路由
         workflow.add_conditional_edges(
             "store_document",
@@ -64,7 +64,7 @@ class KnowledgeQAAgent:
                 "end": END
             }
         )
-        
+
         # 统一入口路由
         def route(state: KnowledgeQAState) -> str:
             if state.get("error"):
@@ -75,9 +75,9 @@ class KnowledgeQAAgent:
                 return "retrieve_context"
             else:
                 return "handle_error"
-        
+
         workflow.set_conditional_entry_point(route)
-        
+
         return workflow
 
     def _route_after_store(self, state: KnowledgeQAState) -> str:
@@ -267,7 +267,7 @@ class KnowledgeQAAgent:
             state = self._process_file_node(state)
             if not state.get("error"):
                 state = self._store_document_node(state)
-        
+
         # 如果有查询，进行知识检索
         if mode == "query":
             state = self._retrieve_context_node(state)
@@ -329,7 +329,7 @@ if __name__ == "__main__":
     query4 = "关羽有什么特点？"
     print(f"   Q: {query4}")
     print("   A: ", end="", flush=True)
-    
+
     sources = []
     mode = None
     for chunk in agent.chat_streaming(query4):

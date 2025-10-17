@@ -43,9 +43,11 @@ class Settings(BaseSettings):
     log_level: str
 
     class Config:
+        """在.env文件中配置"""
         env_file = ".env"
         case_sensitive = False
         extra = "ignore"
+
 
 settings = Settings()
 
