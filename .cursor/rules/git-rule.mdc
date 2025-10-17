@@ -1,0 +1,165 @@
+---
+description: Git提交规范和最佳实践 - Jupyter Notebooks项目
+globs: ["**/*.ipynb", "**/*.py", "**/*.md", "**/.cursor/**"]
+alwaysApply: true
+---
+
+# Git 提交规范
+
+当用户要求进行Git操作时，AI助手应该遵循以下规范：
+
+## 1. 提交消息格式
+
+### 标准范式
+```
+<行为类型>(<范围>): <描述>
+
+[可选的正文]
+
+[可选的脚注]
+```
+
+### 行为类型 (type)
+- `feat`: 新功能/新案例
+- `fix`: 修复bug
+- `docs`: 文档更新
+- `style`: 代码格式调整（不影响功能）
+- `refactor`: 代码重构
+- `test`: 测试相关
+- `chore`: 构建过程或辅助工具的变动
+- `perf`: 性能优化
+- `ci`: CI/CD相关
+- `build`: 构建系统相关
+- `revert`: 回滚提交
+- `notebook`: Notebook内容更新
+- `data`: 数据集相关
+- `model`: 模型相关
+
+### 范围 (scope) - 针对当前项目
+范围用于指定提交影响的模块或组件，应该：
+- 使用小写字母
+- 用连字符分隔多个单词
+- 根据实际项目结构调整
+
+### 示例 - 针对当前项目
+```bash
+
+# 规则和配置
+git commit -m "chore(rules): 更新项目布局规范"
+git commit -m "docs(rules): 完善Git提交规范"
+git commit -m "fix(config): 修复.gitignore配置"
+
+# 数据和模型
+git commit -m "data(3d-classification): 添加ModelNet40数据集"
+git commit -m "model(spatiotemporal): 保存最佳模型权重"
+git commit -m "chore(scripts): 添加调试脚本"
+
+# 文档更新
+git commit -m "docs(3d-classification): 更新README文档"
+git commit -m "docs(spatiotemporal): 添加使用说明"
+
+# 带详细描述的提交
+git commit -m "feat(3d-classification): 新增3D物体分类案例
+
+- 实现ModelNet40数据集下载
+- 添加3D点云可视化功能
+- 包含数据预处理和统计分析
+- 建立完整的项目结构"
+```
+
+## 2. 推送策略
+
+### 重要原则
+- **绝不自动推送**: 用户说"提交commit"时，只执行 `git commit`，不执行 `git push`
+- **明确指令**: 只有当用户明确说"推送到远程"、"push到远程"等指令时，才执行推送
+- **确认机制**: 推送前应该向用户确认是否真的要推送到远程仓库
+
+### 操作流程
+1. 用户要求提交 → 执行 `git commit`
+2. 用户明确要求推送 → 执行 `git push`
+3. 如果有未推送的commit，提醒用户是否需要推送
+
+## 3. 多文件提交策略
+
+### 智能分组
+当 `git status` 显示多个文件修改时，应该：
+
+1. **分析修改内容**: 理解每个文件的修改含义
+2. **逻辑分组**: 将相关的修改归为一组
+3. **分别提交**: 按逻辑分组进行多次commit
+4. **清晰描述**: 每个commit都有明确的描述
+
+### 分组原则
+- **功能相关**: 同一功能的所有文件一起提交
+- **类型相关**: 同类型的修改一起提交
+- **范围相关**: 同一模块的文件一起提交
+
+### 示例场景 - 针对当前项目
+```bash
+# 场景：同时修改了Notebook内容和配置文件
+# ❌ 错误做法：一次性提交所有
+git commit -m "更新内容"
+
+# ✅ 正确做法：分组提交
+git commit -m "notebook(3d-classification): 更新数据可视化代码"
+git commit -m "fix(config): 修复.gitignore配置"
+
+# 场景：修改了多个相关文件
+# ❌ 错误做法：分别提交每个文件
+git commit -m "fix: 修复数据加载错误"
+git commit -m "fix: 修复可视化错误"
+git commit -m "fix: 修复模型训练错误"
+
+# ✅ 正确做法：相关修改一起提交
+git commit -m "fix(3d-classification): 修复数据预处理和可视化问题"
+
+# 场景：新增项目时的文件组织
+# ❌ 错误做法：一次性提交所有新文件
+git commit -m "新增项目"
+
+# ✅ 正确做法：按功能分组提交
+git commit -m "feat(3d-classification): 新增3D物体分类项目结构"
+git commit -m "notebook(3d-classification): 实现数据集下载和可视化"
+git commit -m "docs(3d-classification): 添加项目说明文档"
+git commit -m "chore(rules): 更新项目布局规范"
+```
+
+## 4. 执行流程
+
+### 提交前检查
+1. 执行 `git status` 查看修改文件
+2. 分析修改内容的逻辑关系
+3. 确定是否需要分组提交
+4. 选择合适的提交消息格式
+
+### 提交执行
+1. 使用 `git add` 添加相关文件
+2. 使用规范格式的commit消息
+3. 确认提交成功
+4. 提醒用户是否需要推送
+
+### 推送确认
+1. 询问用户是否要推送到远程
+2. 确认后执行 `git push`
+3. 报告推送结果
+
+## 5. 项目特定注意事项
+
+### 针对Jupyter Notebooks项目
+- **Notebook文件**: 提交前检查输出是否包含敏感信息
+- **大数据文件**: 避免提交大型数据集文件，使用.gitignore排除
+- **模型文件**: 大型模型文件应使用Git LFS或排除在提交之外
+- **临时文件**: 排除.ipynb_checkpoints/等临时目录
+
+### 通用注意事项
+- **消息简洁**: commit消息应该简洁明了，50字符以内最佳
+- **中文友好**: 支持中文commit消息，但保持简洁
+- **避免空提交**: 确保有实际内容变更再提交
+- **分支管理**: 注意当前分支，避免误提交到错误分支
+- **敏感信息**: 提交前检查是否包含敏感信息（API密钥、密码等）
+
+### 项目结构相关
+- **新项目**: 按照项目布局规范创建目录结构
+- **调试脚本**: 将调试代码放在scripts/目录下
+- **文档更新**: 及时更新README.md文件
+- **规则文件**: 更新.cursor/rules/下的规则文件

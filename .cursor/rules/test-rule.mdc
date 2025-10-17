@@ -1,0 +1,226 @@
+---
+alwaysApply: true
+---
+
+# 测试规范
+
+## 测试组织原则
+
+在编写测试代码时，AI助手必须遵循以下组织规范：
+
+### 1. 测试文件位置
+- **所有测试必须写在 `tests/` 目录下**
+- **禁止在项目根目录或源代码目录创建测试文件**
+- **严格禁止在 `examples/` 目录创建任何测试脚本或测试代码**
+- **`examples/` 目录仅用于演示和使用示例，不是测试目录**
+- **如果需要测试某个功能，必须在 `tests/unit/` 或 `tests/integration/` 创建测试文件**
+
+### 2. 单元测试（Unit Tests）
+放置在 `tests/unit/` 目录
+
+**适用场景：**
+- 测试单个函数的功能
+- 测试单个类的方法
+- 测试独立的工具函数
+- 不依赖外部服务或资源的测试
+- Mock外部依赖的测试
+
+**命名规范：**
+- 文件名：`test_<模块名>.py`
+- 类名：`Test<类名>`
+- 方法名：`test_<功能描述>`
+
+**示例：**
+```python
+# tests/unit/test_document_loader.py
+class TestDocumentLoader:
+    def test_load_pdf(self):
+        # 测试单个PDF加载功能
+        pass
+    
+    def test_is_supported(self):
+        # 测试文件格式支持检查
+        pass
+```
+
+### 3. 集成测试（Integration Tests）
+放置在 `tests/integration/` 目录
+
+**适用场景：**
+- 测试多个组件协同工作
+- 测试完整的业务流程
+- 需要真实外部服务的测试（API、数据库等）
+- 端到端测试
+
+**命名规范：**
+- 文件名：`test_<流程名>_integration.py`
+- 类名：`Test<流程名>Integration`
+- 方法名：`test_<流程描述>`
+
+**示例：**
+```python
+# tests/integration/test_document_qa_integration.py
+class TestDocumentQAIntegration:
+    def test_full_qa_pipeline(self):
+        # 测试：加载文档 -> 分块 -> 向量化 -> 检索 -> 回答
+        pass
+    
+    def test_real_api_embedding(self):
+        # 测试真实API调用
+        pass
+```
+
+## 测试编写规范
+
+### 1. 使用 pytest 框架
+```python
+import pytest
+
+@pytest.fixture
+def sample_data():
+    return {...}
+
+class TestMyClass:
+    def test_method(self, sample_data):
+        assert result == expected
+```
+
+### 2. Mock外部依赖（单元测试）
+```python
+from unittest.mock import Mock, patch
+
+@pytest.fixture
+def mock_api():
+    with patch('module.APIClass') as mock:
+        mock.return_value.method.return_value = "fake_response"
+        yield mock
+```
+
+### 3. 测试文件组织
+```
+tests/
+├── __init__.py
+├── conftest.py              # 共享的fixtures
+├── unit/                    # 单元测试
+│   ├── __init__.py
+│   ├── test_document_loader.py
+│   ├── test_text_splitter.py
+│   └── test_embedding_service.py
+└── integration/             # 集成测试
+    ├── __init__.py
+    ├── test_document_qa_integration.py
+    └── test_api_integration.py
+```
+
+## 决策流程
+
+### 问：我应该写单元测试还是集成测试？
+
+**选择单元测试 (`tests/unit/`) 如果：**
+- ✅ 只测试一个函数或类方法
+- ✅ 可以Mock所有外部依赖
+- ✅ 测试运行速度快（毫秒级）
+- ✅ 不需要真实的网络/文件系统/数据库
+
+**选择集成测试 (`tests/integration/`) 如果：**
+- ✅ 需要测试多个组件的协作
+- ✅ 需要真实的API调用
+- ✅ 测试完整的业务流程
+- ✅ 需要真实的文件系统或数据库
+
+## 示例对照
+
+### ❌ 错误做法
+```python
+# 在 examples/ 目录创建测试脚本
+# examples/test_siliconcloud.py  ❌ 错误！测试不应该在examples
+# examples/qa_example.py  ❌ 错误！如果是测试功能应该在tests/
+
+def test_embeddings():
+    pass
+
+# 在根目录创建测试
+# test_my_function.py  ❌ 错误位置
+
+# 在 src/ 目录创建测试
+# src/test_utils.py  ❌ 错误位置
+```
+
+### ⚠️ examples/ 目录的正确用途
+
+`examples/` 目录应该只包含：
+- ✅ 使用示例和演示代码（供用户参考如何使用）
+- ✅ 示例数据文件（PDF、MD、DOCX等）
+- ❌ 不应包含测试代码
+- ❌ 不应包含调试脚本
+- ❌ 不应包含验证功能的脚本
+
+**如果一个脚本的目的是"测试"、"验证"、"检查"某个功能是否正常工作，它就应该在 `tests/` 目录下！**
+
+### ✅ 正确做法
+
+**单元测试示例：**
+```python
+# tests/unit/test_embeddings.py  ✅ 正确位置
+import pytest
+from unittest.mock import Mock
+
+class TestSiliconCloudEmbeddings:
+    @pytest.fixture
+    def mock_api(self):
+        # Mock API调用
+        pass
+    
+    def test_embed_documents(self, mock_api):
+        # 测试单个方法
+        embeddings = SiliconCloudEmbeddings(api_key="test")
+        result = embeddings.embed_documents(["test"])
+        assert len(result) > 0
+```
+
+**集成测试示例：**
+```python
+# tests/integration/test_embedding_pipeline_integration.py  ✅ 正确位置
+class TestEmbeddingPipelineIntegration:
+    def test_full_pipeline_with_real_api(self):
+        # 测试完整流程：加载 -> 分块 -> 向量化 -> 搜索
+        loader = DocumentLoader()
+        service = EmbeddingService()
+        
+        # 使用真实API
+        docs = loader.load("example.pdf")
+        vector_store = service.create_vector_store(docs)
+        results = service.similarity_search("query")
+        
+        assert len(results) > 0
+```
+
+## 注意事项
+
+1. **测试隔离**：每个测试应该独立，不依赖其他测试的执行顺序
+2. **清理资源**：使用 fixture 的 cleanup 或 `@pytest.fixture(autouse=True)` 清理
+3. **测试覆盖率**：单元测试应覆盖核心逻辑的80%以上
+4. **命名清晰**：测试名称应该清楚说明测试的内容和预期
+5. **快速执行**：单元测试应该快速执行，集成测试可以较慢但应标记 `@pytest.mark.integration`
+
+## 运行测试
+
+```bash
+# 运行所有测试
+pytest
+
+# 只运行单元测试
+pytest tests/unit/
+
+# 只运行集成测试
+pytest tests/integration/
+
+# 运行特定文件
+pytest tests/unit/test_document_loader.py
+
+# 运行特定测试方法
+pytest tests/unit/test_document_loader.py::TestDocumentLoader::test_load_pdf
+
+# 带覆盖率报告
+pytest --cov=src --cov-report=html
+```
