@@ -36,7 +36,7 @@ def main():
         cmd = [
             "streamlit", "run", "src/knowledge_qa/app.py",
             "--server.port", port,
-            "--server.address", "localhost",
+            "--server.address", "0.0.0.0",
             "--browser.gatherUsageStats", "false"
         ]
         
