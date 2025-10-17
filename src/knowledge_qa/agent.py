@@ -264,13 +264,20 @@ class KnowledgeQAAgent:
 
         # 如果有文件，先处理文件
         if mode == "upload":
+            # 发送文件处理状态
+            yield {"status": "正在处理文件...", "type": "status"}
             state = self._process_file_node(state)
             if not state.get("error"):
+                yield {"status": "正在存储文档...", "type": "status"}
                 state = self._store_document_node(state)
 
         # 如果有查询，进行知识检索
         if mode == "query":
+            yield {"status": "正在检索相关知识...", "type": "status"}
             state = self._retrieve_context_node(state)
+
+        # 开始生成回答
+        yield {"status": "正在生成回答...", "type": "status"}
 
         # 使用LLM的流式接口
         sources = []
