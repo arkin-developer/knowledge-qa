@@ -2,17 +2,6 @@
 
 基于 LangGraph + FAISS + LLM 构建的智能知识库问答系统，支持多种文档格式上传、向量检索和流式对话。
 
-## 🚀 功能特性
-
-- **多格式文档支持**: PDF、Word (.docx)、Markdown (.md)、TXT
-- **智能文本分段**: 自动进行合适粒度的文本分段
-- **向量化存储**: 使用 FAISS 构建高效的向量索引
-- **智能检索**: 基于语义相似度的文档检索
-- **流式对话**: 支持实时流式回答生成
-- **多轮对话**: 保留上下文，支持连续提问
-- **可观测性**: 集成 LangSmith 进行完整的调用链追踪
-- **多种界面**: 提供 CLI 和 Web UI 两种使用方式
-
 ## 🛠️ 技术栈
 
 - **框架**: LangGraph (工作流编排)
@@ -29,14 +18,35 @@
 
 ### 环境要求
 
-- Python 3.8+
-- UV 包管理器
+- Python 3.9+
+- uv 包管理器
+- Docker & Docker Compose (可选，用于容器化部署)
 
 ### 安装步骤
 
+#### 方法一：Docker 部署 (推荐)
+
 1. **克隆项目**
 ```bash
-git clone <repository-url>
+git clone https://github.com/arkin-developer/knowledge-qa.git
+cd knowledge-qa
+```
+
+2. **一键部署**
+```bash
+chmod +x init.sh
+./init.sh
+```
+
+3. **访问应用**
+- Web 界面: http://localhost:8501
+- 详细部署说明请参考 [DEPLOYMENT.md](DEPLOYMENT.md)
+
+#### 方法二：本地开发部署
+
+1. **克隆项目**
+```bash
+git clone https://github.com/arkin-developer/knowledge-qa.git
 cd knowledge-qa
 ```
 
@@ -124,36 +134,14 @@ uv run streamlit run src/knowledge_qa/app.py --server.port 8501
 
 访问 http://localhost:8501 使用 Web 界面。
 
-### 3. 编程接口
 
-```python
-from src.knowledge_qa.agent import KnowledgeQAAgent
-
-# 初始化 Agent
-agent = KnowledgeQAAgent()
-
-# 上传文档
-result = agent.chat("", file_path="path/to/document.pdf")
-print(f"上传结果: {result['mode']}")
-
-# 查询知识库
-result = agent.chat("您的问题")
-print(f"回答: {result['answer']}")
-print(f"引用来源: {len(result['sources'])} 个")
-
-# 流式对话
-for chunk in agent.chat_streaming("您的问题"):
-    if isinstance(chunk, dict):
-        print(f"模式: {chunk.get('mode')}")
-    else:
-        print(chunk, end="", flush=True)
-```
 
 ## 📁 项目结构
 
 ```
 knowledge-qa/
-├── src/knowledge_qa/          # 核心源代码
+├── .cursor                   # cursor 编码规则
+├── src/knowledge_qa/         # 核心源代码
 │   ├── agent.py              # LangGraph Agent 主逻辑
 │   ├── app.py                # Streamlit Web 界面
 │   ├── cli.py                # 命令行界面
@@ -200,23 +188,10 @@ uv run python -m src.knowledge_qa.llm
 测试文本处理：
 ```bash
 uv run python -m src.knowledge_qa.text_processor
+
 ```
 
-## 📊 性能特性
 
-- **向量检索**: 毫秒级响应
-- **文档处理**: 支持大文件批量处理
-- **流式输出**: 实时响应，提升用户体验
-- **内存管理**: 智能的对话上下文管理
-- **错误处理**: 完善的异常处理和恢复机制
-
-## 🤝 贡献指南
-
-1. Fork 项目
-2. 创建功能分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 打开 Pull Request
 
 ## 📄 许可证
 
@@ -228,7 +203,7 @@ uv run python -m src.knowledge_qa.text_processor
 
 1. 查看 [Issues](https://github.com/your-repo/issues) 页面
 2. 创建新的 Issue 描述您的问题
-3. 联系维护者
+3. 联系维护者@arkin-dev@qq.com
 
 ---
 
