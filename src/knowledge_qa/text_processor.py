@@ -6,6 +6,7 @@ from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import FAISS
+from langsmith import traceable
 
 from .config import settings
 from .log_manager import log
@@ -53,6 +54,7 @@ class TextProcessor:
         """分段文本"""
         return self.splitter.create_documents([text])
 
+    @traceable(name="add_documents")
     def add_documents(self, documents: List[Document], batch_size: int = 50) -> None:
         """添加文档到向量存储
 
@@ -110,6 +112,7 @@ class TextProcessor:
             log.error(f"保存向量存储失败: {e}")
             raise e
 
+    @traceable(name="similarity_search")
     def similarity_search(self, query: str, k: int = settings.search_k) -> List[Document]:
         """相似度搜索"""
         if self.vector_store is None:

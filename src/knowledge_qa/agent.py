@@ -4,6 +4,7 @@ from typing import List, Dict, Any, Optional, TypedDict
 from langchain_core.documents import Document
 from langgraph.graph import StateGraph, END
 from pathlib import Path
+from langsmith import traceable
 
 from .text_processor import TextProcessor
 from .llm import LLM
@@ -84,6 +85,7 @@ class KnowledgeQAAgent:
         """文档存储后的路由决策"""
         return "end"  # 上传模式直接结束
 
+    @traceable(name="process_file_node")
     def _process_file_node(self, state: KnowledgeQAState) -> KnowledgeQAState:
         """文件处理节点"""
         log.info("执行文件处理")
@@ -113,6 +115,7 @@ class KnowledgeQAAgent:
 
         return state
 
+    @traceable(name="store_document_node")
     def _store_document_node(self, state: KnowledgeQAState) -> KnowledgeQAState:
         """文档存储节点"""
         log.info("执行文档存储")
@@ -138,6 +141,7 @@ class KnowledgeQAAgent:
 
         return state
 
+    @traceable(name="retrieve_context_node")
     def _retrieve_context_node(self, state: KnowledgeQAState) -> KnowledgeQAState:
         """上下文检索节点"""
         log.info("执行上下文检索")
@@ -160,6 +164,7 @@ class KnowledgeQAAgent:
 
         return state
 
+    @traceable(name="generate_answer_node")
     def _generate_answer_node(self, state: KnowledgeQAState) -> KnowledgeQAState:
         """答案生成节点"""
         log.info("执行答案生成")
@@ -207,6 +212,7 @@ class KnowledgeQAAgent:
 
         return state
 
+    @traceable(name="chat")
     def chat(self, query: str, file_path: Optional[str] = None) -> Dict[str, Any]:
         """对话接口"""
         log.info(f"开始处理用户输入 - 查询: {query}, 文件: {file_path}")
@@ -241,6 +247,7 @@ class KnowledgeQAAgent:
         log.info("输入处理完成")
         return result
 
+    @traceable(name="chat_streaming")
     def chat_streaming(self, query: str, file_path: Optional[str] = None):
         """流式对话接口"""
         log.info(f"开始流式处理用户输入 - 查询: {query}, 文件: {file_path}")

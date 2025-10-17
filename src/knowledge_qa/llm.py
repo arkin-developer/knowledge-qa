@@ -3,6 +3,7 @@
 from typing import List, Dict, Any, Optional
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage, BaseMessage
+from langsmith import traceable
 
 from .config import settings
 from .log_manager import log
@@ -34,6 +35,7 @@ class LLM:
         """
         return system_prompt
 
+    @traceable(name="llm_generate")
     def generate(self, query: str, context_docs: List[Any], use_memory: bool = True) -> Dict[str, Any]:
         """根据知识库上下文回答问题"""
         try:
@@ -88,6 +90,7 @@ class LLM:
             log.error(f"回答问题失败: {e}")
             raise e
 
+    @traceable(name="llm_generate_streaming")
     def generate_streaming(self, query: str, context_docs: List[Any], use_memory: bool = True):
         """根据知识库上下文流式回答问题"""
         try:
