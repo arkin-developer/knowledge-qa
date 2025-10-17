@@ -25,17 +25,6 @@ services:
     networks:
       - knowledge-qa-network
 
-  # Redis 缓存服务 (可选，用于会话管理)
-  redis:
-    image: redis:7-alpine
-    container_name: knowledge-qa-redis
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    restart: unless-stopped
-    networks:
-      - knowledge-qa-network
 
   # Nginx 反向代理 (可选，用于生产环境)
   nginx:
@@ -55,9 +44,6 @@ services:
     profiles:
       - production
 
-volumes:
-  redis_data:
-    driver: local
 
 networks:
   knowledge-qa-network:
