@@ -87,7 +87,12 @@ LOG_LEVEL=INFO
 
 ### 1. 命令行界面 (CLI)
 
-启动 CLI 界面：
+**方法一：使用启动脚本（推荐）**
+```bash
+uv run python start_cli.py
+```
+
+**方法二：直接启动**
 ```bash
 uv run python -m src.knowledge_qa.cli
 ```
@@ -103,7 +108,16 @@ CLI 功能菜单：
 
 ### 2. Web 界面 (Streamlit)
 
-启动 Web 界面：
+**方法一：使用启动脚本（推荐）**
+```bash
+# 使用默认端口 8501
+uv run python start_web.py
+
+# 指定端口
+uv run python start_web.py 8502
+```
+
+**方法二：直接启动**
 ```bash
 uv run streamlit run src/knowledge_qa/app.py --server.port 8501
 ```
