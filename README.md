@@ -122,7 +122,7 @@ uv sync
    
    - **📌 获取 API 密钥：**
      - **SiliconCloud**: 访问 [https://cloud.siliconflow.cn](https://cloud.siliconflow.cn) 注册并获取 API Key
-        - **LangSmith** (可选): 访问 [https://smith.langchain.com](https://smith.langchain.com) 注册并获取 API Key
+     - **LangSmith** (可选): 访问 [https://smith.langchain.com](https://smith.langchain.com) 注册并获取 API Key
 
 
 
