@@ -304,7 +304,11 @@ class CLI:
             sys.exit(1)
 
 
-if __name__ == "__main__":
-    # 测试命令，根目录路径运行：uv run python -m src.knowledge_qa.cli
+def main():
+    """主函数"""
     cli = CLI()
     cli.run()
+
+if __name__ == "__main__":
+    # 测试命令，根目录路径运行：uv run python -m src.knowledge_qa.cli
+    main()
