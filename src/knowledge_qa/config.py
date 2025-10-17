@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     # 搜索配置
     search_k: int
 
+    # 记忆配置
+    memory_window_size: int
+
     # LangSmith 配置
     langsmith_api_key: str
     langsmith_project: str
