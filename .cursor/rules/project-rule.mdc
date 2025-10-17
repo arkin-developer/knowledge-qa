@@ -1,0 +1,71 @@
+---
+alwaysApply: true
+---
+
+# UV 包管理规则
+
+## 强制使用 UV 命令
+
+本项目使用 UV 作为包管理工具，所有涉及以下操作时必须使用 UV 命令：
+
+### 1. 版本管理
+- ✅ `uv run python` - 运行Python脚本
+- ✅ `uv run python -m module` - 运行模块
+- ❌ `python` - 禁止直接使用系统Python
+- ❌ `python -m module` - 禁止直接运行模块
+
+### 2. 依赖管理
+- ✅ `uv add package_name` - 添加依赖包
+- ✅ `uv remove package_name` - 删除依赖包
+- ✅ `uv sync` - 同步依赖
+- ✅ `uv lock` - 更新锁文件
+- ❌ `pip install` - 禁止使用pip
+- ❌ `pip uninstall` - 禁止使用pip卸载
+
+### 3. 环境管理
+- ✅ `uv venv` - 创建虚拟环境
+- ✅ `uv shell` - 激活环境
+- ✅ `uv run` - 在环境中运行命令
+- ❌ `conda activate` - 禁止使用conda激活
+- ❌ `source venv/bin/activate` - 禁止手动激活
+
+### 4. 项目启动
+- ✅ `uv run python -m src.knowledge_qa.agent` - 运行Agent
+- ✅ `uv run python -m src.knowledge_qa.llm` - 运行LLM测试
+- ✅ `uv run python -m src.knowledge_qa.text_processor` - 运行文本处理器
+- ❌ `python src/knowledge_qa/agent.py` - 禁止直接运行文件
+
+### 5. 开发工具
+- ✅ `uv run pytest` - 运行测试
+- ✅ `uv run black` - 代码格式化
+- ✅ `uv run mypy` - 类型检查
+- ❌ `pytest` - 禁止直接使用工具
+
+## 执行原则
+
+1. **一致性**: 所有团队成员必须使用相同的UV命令
+2. **可重现性**: 确保环境配置一致，避免依赖冲突
+3. **性能**: UV比pip更快，提供更好的依赖解析
+4. **锁定**: 使用uv.lock确保依赖版本一致性
+
+## 示例
+
+```bash
+# 添加新依赖
+uv add langgraph
+
+# 运行测试
+uv run python -m src.knowledge_qa.agent
+
+# 同步环境
+uv sync
+
+# 激活环境
+uv shell
+```
+
+## 注意事项
+
+- 项目根目录必须包含 `pyproject.toml` 和 `uv.lock`
+- 所有Python脚本都应该通过 `uv run` 执行
+- 开发环境配置应该通过UV管理，而不是手动安装
