@@ -86,6 +86,26 @@ class StreamlitApp:
 
             if st.button("刷新向量库信息", type="secondary"):
                 self._refresh_vector_store_info()
+            
+            # 危险操作区域
+            st.subheader("⚠️ 危险操作")
+            
+            # 添加红色按钮样式
+            st.markdown("""
+            <style>
+            .danger-button {
+                background-color: #ff4444 !important;
+                color: white !important;
+                border: 2px solid #ff0000 !important;
+            }
+            .danger-button:hover {
+                background-color: #cc0000 !important;
+            }
+            </style>
+            """, unsafe_allow_html=True)
+            
+            if st.button("🗑️ 清除向量数据库", type="primary", help="⚠️ 危险操作：永久删除所有向量数据，无法恢复！", key="clear_vector_db_btn"):
+                self._clear_vector_store()
 
     def _handle_file_upload(self, uploaded_file):
         """处理文件上传"""
@@ -157,6 +177,42 @@ class StreamlitApp:
     def _refresh_vector_store_info(self):
         """刷新向量库信息"""
         st.rerun()
+
+    def _clear_vector_store(self):
+        """清除向量数据库"""
+        log.info("🔍 开始清除向量数据库流程")
+        
+        try:
+            agent = self._get_agent()
+            log.info("✅ Agent 获取成功")
+            
+            with st.spinner("正在清除向量数据库..."):
+                log.info("🔄 调用 TextProcessor.clear_vector_store()")
+                # 调用 TextProcessor 的清除方法
+                success = agent.text_processor.clear_vector_store()
+                log.info(f"📊 清除操作结果: {'成功' if success else '失败'}")
+                
+                if success:
+                    # 清除已上传文件记录
+                    files_count = len(st.session_state.uploaded_files)
+                    st.session_state.uploaded_files = []
+                    log.info(f"📁 清除已上传文件记录: {files_count} 个文件")
+                    
+                    st.success("✅ 向量数据库已成功清除！")
+                    st.info("💡 现在您可以重新上传文档来构建新的知识库。")
+                    log.info("🎉 UI 显示清除成功消息")
+                    
+                    # 自动刷新向量数据库信息
+                    log.info("🔄 自动刷新向量数据库信息")
+                    st.rerun()
+                else:
+                    st.error("❌ 清除向量数据库失败，请查看日志获取详细信息。")
+                    log.error("❌ UI 显示清除失败消息")
+                    
+        except Exception as e:
+            error_msg = f"❌ 清除向量数据库失败: {str(e)}"
+            st.error(error_msg)
+            log.error(f"清除向量数据库失败: {str(e)}")
 
     def render_main_interface(self):
         """渲染主界面"""

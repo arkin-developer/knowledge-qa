@@ -120,6 +120,64 @@ class TextProcessor:
             raise ValueError("向量存储未初始化")
         return self.vector_store.similarity_search(query, k, filter=None)
 
+    def clear_vector_store(self) -> bool:
+        """清除向量数据库
+        
+        Returns:
+            bool: 清除是否成功
+        """
+        log.info("🚀 开始执行向量数据库清除操作")
+        
+        try:
+            # 检查清除前的状态
+            vector_store_status = "存在" if self.vector_store is not None else "不存在"
+            log.info(f"📊 清除前内存向量存储状态: {vector_store_status}")
+            
+            # 清除内存中的向量存储
+            self.vector_store = None
+            log.info("✅ 内存中的向量存储已清除")
+            
+            # 检查磁盘上的向量数据库文件
+            persist_dir = Path(settings.vector_store_path)
+            log.info(f"📁 向量数据库路径: {persist_dir}")
+            log.info(f"📊 目录是否存在: {'是' if persist_dir.exists() else '否'}")
+            
+            if persist_dir.exists():
+                # 列出目录内容
+                try:
+                    files_in_dir = list(persist_dir.iterdir())
+                    log.info(f"📋 目录中的文件: {[f.name for f in files_in_dir]}")
+                except Exception as e:
+                    log.warning(f"⚠️ 无法列出目录内容: {e}")
+                
+                # 删除磁盘上的向量数据库文件
+                import shutil
+                shutil.rmtree(persist_dir)
+                log.info(f"✅ 磁盘向量数据库已删除: {persist_dir}")
+            else:
+                log.info("ℹ️ 向量数据库目录不存在，无需删除")
+            
+            # 重新创建空的目录
+            persist_dir.mkdir(parents=True, exist_ok=True)
+            log.info(f"✅ 已重新创建向量数据库目录: {persist_dir}")
+            
+            # 验证目录创建成功
+            if persist_dir.exists():
+                log.info("✅ 验证: 向量数据库目录创建成功")
+            else:
+                log.error("❌ 验证: 向量数据库目录创建失败")
+                return False
+            
+            log.info("🎉 向量数据库清除完成！")
+            return True
+            
+        except Exception as e:
+            log.error(f"❌ 清除向量数据库失败: {e}")
+            log.error(f"❌ 错误类型: {type(e).__name__}")
+            import traceback
+            log.error(f"❌ 错误堆栈: {traceback.format_exc()}")
+            return False
+
 
 if __name__ == "__main__":
     # 测试命令，根目录路径运行：uv run python -m src.knowledge_qa.text_processor
