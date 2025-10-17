@@ -2,6 +2,8 @@
 
 基于 LangGraph + FAISS + LLM 构建的智能知识库问答系统，支持多种文档格式上传、向量检索和流式对话。
 
+![image-20251018004817302](https://mr-lai.oss-cn-zhangjiakou.aliyuncs.com/macminim4macminim4image-20251018004817302.png)
+
 ## 🛠️ 技术栈
 
 - **框架**: LangGraph (工作流编排)
@@ -18,7 +20,7 @@
 
 ### 环境要求
 
-- Python 3.9+
+- Python 3.13
 - uv 包管理器
 - Docker & Docker Compose (可选，用于容器化部署)
 
@@ -54,50 +56,75 @@ git clone https://github.com/arkin-developer/knowledge-qa.git
 cd knowledge-qa
 ```
 
-2. **安装依赖**
+2. **创建 Python 3.13 环境**（推荐使用 conda）
+
+```bash
+# 创建 conda 环境
+conda create -n knowledge-qa python=3.13 -y
+
+# 激活环境
+conda activate knowledge-qa
+
+# 安装uv
+pip install uv
+```
+
+3. **安装依赖**
 
 ```bash
 uv sync
 ```
 
-3. **配置环境变量**
-   创建 `.env` 文件并配置以下参数：
+4. **配置环境变量**
+   
+   复制示例配置文件：
+   ```bash
+   cp .env.example .env
+   ```
+   
+   然后编辑 `.env` 文件，配置以下参数：
+   
+   ```env
+   # SiliconCloud 配置
+   SILICONCLOUD_API_KEY=your_api_key
+   SILICONCLOUD_API_BASE=https://api.siliconflow.cn/v1
+   
+   # LLM 配置
+   LLM_MODEL=Qwen/Qwen3-VL-30B-A3B-Instruct
+   LLM_TEMPERATURE=0.7
+   LLM_MAX_TOKENS=256000
+   
+   # 嵌入模型配置
+   EMBEDDING_PROVIDER=siliconcloud
+   EMBEDDING_MODEL=Qwen/Qwen3-Embedding-8B
+   
+   # 文本分段配置
+   CHUNK_SIZE=600
+   CHUNK_OVERLAP=100
+   
+   # 向量库配置
+   VECTOR_STORE_PATH=./data/faiss_db
+   SEARCH_K=3
+   
+   # 记忆配置
+   MEMORY_WINDOW_SIZE=30
+   
+   # LangSmith 配置
+   LANGSMITH_API_KEY=your_langsmith_api_key
+   LANGSMITH_PROJECT=knowledge_qa_test
+   LANGCHAIN_TRACING_V2=true
+   LANGCHAIN_DEBUG=false
+   
+   # 应用配置
+   APP_ENV=development
+   LOG_LEVEL=INFO
+   ```
+   
+   - **📌 获取 API 密钥：**
+     - **SiliconCloud**: 访问 [https://cloud.siliconflow.cn](https://cloud.siliconflow.cn) 注册并获取 API Key
+        - **LangSmith** (可选): 访问 [https://smith.langchain.com](https://smith.langchain.com) 注册并获取 API Key
 
-```env
-# SiliconCloud 配置
-SILICONCLOUD_API_KEY=your_api_key
-SILICONCLOUD_API_BASE=https://api.siliconflow.cn/v1
 
-# LLM 配置
-LLM_MODEL=Qwen/Qwen3-VL-30B-A3B-Instruct
-LLM_TEMPERATURE=0.7
-LLM_MAX_TOKENS=256000
-
-# 嵌入模型配置
-EMBEDDING_PROVIDER=siliconcloud
-EMBEDDING_MODEL=Qwen/Qwen3-Embedding-8B
-
-# 文本分段配置
-CHUNK_SIZE=600
-CHUNK_OVERLAP=100
-
-# 向量库配置
-VECTOR_STORE_PATH=./data/faiss_db
-SEARCH_K=3
-
-# 记忆配置
-MEMORY_WINDOW_SIZE=30
-
-# LangSmith 配置
-LANGSMITH_API_KEY=your_langsmith_api_key
-LANGSMITH_PROJECT=knowledge_qa_test
-LANGCHAIN_TRACING_V2=true
-LANGCHAIN_DEBUG=false
-
-# 应用配置
-APP_ENV=development
-LOG_LEVEL=INFO
-```
 
 ## 🎯 使用指南
 
@@ -171,7 +198,9 @@ knowledge-qa/
 
 ## 🔍 可观测性
 
-系统集成了 LangSmith 进行完整的调用链追踪：
+系统集成了 LangSmith 进行完整的调用链追踪：（当前项目的URL：https://smith.langchain.com/public/caffb587-3dab-41c3-8967-77d299180e62/r）
+
+![image-20251018005017609](https://mr-lai.oss-cn-zhangjiakou.aliyuncs.com/macminim4macminim4image-20251018005017609.png)
 
 1. 访问 https://smith.langchain.com/
 2. 登录您的 LangSmith 账户
@@ -200,7 +229,6 @@ uv run python -m src.knowledge_qa.llm
 
 ```bash
 uv run python -m src.knowledge_qa.text_processor
-
 ```
 
 ## 📄 许可证
