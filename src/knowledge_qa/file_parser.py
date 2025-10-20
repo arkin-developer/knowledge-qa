@@ -48,10 +48,18 @@ class TextFileParser:
     @staticmethod
     def parse_md(file_path: str) -> str:
         """解析MD文件"""
-        loader = UnstructuredMarkdownLoader(file_path)
-        docs = loader.load()
-        text = "\n".join([doc.page_content for doc in docs])
-        return TextFileParser.strip_text(text)
+        try:
+            # 尝试使用UnstructuredMarkdownLoader
+            loader = UnstructuredMarkdownLoader(file_path)
+            docs = loader.load()
+            text = "\n".join([doc.page_content for doc in docs])
+            return TextFileParser.strip_text(text)
+        except Exception as e:
+            # 如果UnstructuredMarkdownLoader失败，回退到简单文本读取
+            print(f"UnstructuredMarkdownLoader失败，使用简单文本读取: {e}")
+            with open(file_path, 'r', encoding='utf-8') as file:
+                text = file.read()
+                return TextFileParser.strip_text(text)
 
     # @staticmethod
     # def parse_csv(file_path: str) -> str:
