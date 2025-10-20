@@ -220,8 +220,8 @@ class CLI:
                 self.console.print()  # 换行
 
                 if sources:
-                    self.console.print("\n[bold cyan]📚 引用来源:[/bold cyan]")
-                    for source in sources[:3]:
+                    self.console.print(f"\n[bold cyan]📚 引用来源 (共{len(sources)}条):[/bold cyan]")
+                    for source in sources:
                         content = source.get("content", "")[:100]
                         self.console.print(
                             f"  [cyan][{source.get('index')}][/cyan] {content}...")
@@ -247,8 +247,8 @@ class CLI:
 
             sources = result.get("sources", [])
             if sources:
-                self.console.print("\n[bold cyan]📚 引用来源:[/bold cyan]")
-                for source in sources[:3]:
+                self.console.print(f"\n[bold cyan]📚 引用来源 (共{len(sources)}条):[/bold cyan]")
+                for source in sources:
                     content = source.get("content", "")[:100]
                     self.console.print(
                         f"  [cyan][{source.get('index')}][/cyan] {content}...")
