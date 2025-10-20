@@ -55,12 +55,12 @@ class TextProcessor:
         return self.splitter.create_documents([text])
 
     @traceable(name="add_documents")
-    def add_documents(self, documents: List[Document], batch_size: int = 50) -> None:
+    def add_documents(self, documents: List[Document], batch_size: int = 10) -> None:
         """添加文档到向量存储
 
         Args:
             documents: 要添加的文档列表
-            batch_size: 首次创建向量存储时的批次大小，默认50
+            batch_size: 批次大小，默认10（适合大多数embedding模型）
         """
         try:
             if not documents:
@@ -68,7 +68,7 @@ class TextProcessor:
                 return
 
             total_docs = len(documents)
-            log.info(f"准备添加 {total_docs} 个文档")
+            log.info(f"准备添加 {total_docs} 个文档，批次大小: {batch_size}")
 
             # 如果向量存储不存在，使用第一批创建
             if self.vector_store is None:
@@ -78,17 +78,25 @@ class TextProcessor:
                     first_batch, self.embeddings)
                 log.info(f"✅ 向量存储创建成功，已添加第 1 批 ({len(first_batch)} 个文档)")
 
-                # 处理剩余文档 - 一次性全部添加
+                # 分批处理剩余文档
                 remaining_docs = documents[batch_size:]
                 if remaining_docs:
-                    log.info(f"正在一次性添加剩余 {len(remaining_docs)} 个文档...")
-                    self.vector_store.add_documents(remaining_docs)
-                    log.info(f"✅ 剩余文档添加成功")
+                    log.info(f"开始分批添加剩余 {len(remaining_docs)} 个文档...")
+                    for i in range(0, len(remaining_docs), batch_size):
+                        batch = remaining_docs[i:i + batch_size]
+                        batch_num = i // batch_size + 2  # 从第2批开始计数
+                        log.info(f"正在处理第 {batch_num} 批 ({len(batch)} 个文档)...")
+                        self.vector_store.add_documents(batch)
+                        log.info(f"✅ 第 {batch_num} 批添加成功")
             else:
-                # 向量存储已存在，一次性添加所有文档
-                log.info(f"向量存储已存在，正在一次性添加 {total_docs} 个文档...")
-                self.vector_store.add_documents(documents)
-                log.info(f"✅ 所有文档添加成功")
+                # 向量存储已存在，分批添加所有文档
+                log.info(f"向量存储已存在，开始分批添加 {total_docs} 个文档...")
+                for i in range(0, len(documents), batch_size):
+                    batch = documents[i:i + batch_size]
+                    batch_num = i // batch_size + 1
+                    log.info(f"正在处理第 {batch_num} 批 ({len(batch)} 个文档)...")
+                    self.vector_store.add_documents(batch)
+                    log.info(f"✅ 第 {batch_num} 批添加成功")
 
             log.info(f"🎉 所有文档添加完成！总计 {total_docs} 个文档")
 
