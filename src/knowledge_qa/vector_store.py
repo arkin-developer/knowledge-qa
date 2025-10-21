@@ -215,16 +215,82 @@ class VectorStore:
         log.info(f"所有文档添加完成，总计 {total_docs} 个文档")
 
     @traceable(name="similarity_search")
-    def similarity_search(self, query: str, k: int = None, filter: Optional[Dict[str, Any]] = None) -> List[Document]:
-        """相似度搜索"""
+    def similarity_search(self, query: str, k: int = None, filter: Optional[Dict[str, Any]] = None, include_context: bool = True) -> List[Document]:
+        """
+        相似度搜索，支持自动包含上下文文档
+        
+        Args:
+            query: 搜索查询
+            k: 返回结果数量
+            filter: 过滤条件
+            include_context: 是否包含每个结果的前后文文档
+        
+        Returns:
+            文档列表，如果include_context=True，会包含每个匹配文档的前后文
+        """
         if self._vector_store is None:
             raise ValueError("向量存储未初始化，请先添加文档")
 
         k = k or settings.search_k
-        results = self._vector_store.similarity_search(
+        
+        # 执行向量相似度搜索
+        base_results = self._vector_store.similarity_search(
             query, k=k, filter=filter)
-        log.info(f"搜索完成: 查询='{query[:50]}...', 返回={len(results)} 个结果")
-        return results
+        
+        if not include_context:
+            log.info(f"搜索完成: 查询='{query[:50]}...', 返回={len(base_results)} 个结果")
+            return base_results
+        
+        # 收集所有相关文档（包括上下文）
+        all_documents = []
+        processed_doc_ids = set()  # 避免重复添加
+        
+        for doc in base_results:
+            # 获取文档ID
+            doc_id = None
+            for id_key, stored_doc in self._vector_store.docstore._dict.items():
+                if stored_doc == doc:
+                    doc_id = id_key
+                    break
+            
+            if doc_id is None:
+                # 如果找不到ID，直接添加原文档
+                if id(doc) not in processed_doc_ids:
+                    all_documents.append(doc)
+                    processed_doc_ids.add(id(doc))
+                continue
+            
+            # 获取上下文文档
+            try:
+                context = self.get_context_documents(doc_id, context_size=1)
+                
+                # 添加前文文档（如果存在且未处理过）
+                for prev_doc in context['previous']:
+                    if id(prev_doc) not in processed_doc_ids:
+                        all_documents.append(prev_doc)
+                        processed_doc_ids.add(id(prev_doc))
+                
+                # 添加当前文档（如果未处理过）
+                for curr_doc in context['current']:
+                    if id(curr_doc) not in processed_doc_ids:
+                        all_documents.append(curr_doc)
+                        processed_doc_ids.add(id(curr_doc))
+                
+                # 添加后文文档（如果存在且未处理过）
+                for next_doc in context['next']:
+                    if id(next_doc) not in processed_doc_ids:
+                        all_documents.append(next_doc)
+                        processed_doc_ids.add(id(next_doc))
+                        
+            except Exception as e:
+                log.warning(f"获取文档 {doc_id} 的上下文失败: {e}")
+                # 如果获取上下文失败，至少添加原文档
+                if id(doc) not in processed_doc_ids:
+                    all_documents.append(doc)
+                    processed_doc_ids.add(id(doc))
+        
+        log.info(f"搜索完成: 查询='{query[:50]}...', 基础结果={len(base_results)} 个, 包含上下文后={len(all_documents)} 个")
+        return all_documents
 
     @traceable(name="similarity_search_with_score")
     def similarity_search_with_score(self, query: str, k: int = None, filter: Optional[Dict[str, Any]] = None) -> List[tuple]:
