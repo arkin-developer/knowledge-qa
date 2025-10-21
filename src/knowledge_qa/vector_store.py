@@ -568,6 +568,126 @@ class VectorStore:
             log.error(f"打印索引信息失败: {e}")
             print(f"错误: {e}")
 
+    def get_context_documents(self, doc_id: str, context_size: int = 1) -> Dict[str, List[Document]]:
+        """
+        根据文档ID获取其上下文文档（前文和后文）
+        
+        Args:
+            doc_id: 文档ID
+            context_size: 上下文文档数量（前后各取多少个）
+        
+        Returns:
+            Dict包含 'previous', 'current', 'next' 三个键的文档列表
+        """
+        if self._vector_store is None:
+            raise ValueError("向量存储未初始化，请先添加文档")
+
+        try:
+            # 获取所有文档ID（按顺序）
+            all_ids = list(self._vector_store.docstore._dict.keys())
+            total_count = len(all_ids)
+            
+            if doc_id not in all_ids:
+                raise ValueError(f"文档ID '{doc_id}' 不存在")
+            
+            # 找到当前文档的索引位置
+            current_index = all_ids.index(doc_id)
+            
+            # 计算上下文范围
+            start_index = max(0, current_index - context_size)
+            end_index = min(total_count, current_index + context_size + 1)
+            
+            # 获取上下文文档
+            context_docs = {}
+            
+            # 前文文档
+            prev_docs = []
+            for i in range(start_index, current_index):
+                doc = self._vector_store.docstore._dict[all_ids[i]]
+                prev_docs.append(doc)
+            context_docs['previous'] = prev_docs
+            
+            # 当前文档
+            current_doc = self._vector_store.docstore._dict[doc_id]
+            context_docs['current'] = [current_doc]
+            
+            # 后文文档
+            next_docs = []
+            for i in range(current_index + 1, end_index):
+                doc = self._vector_store.docstore._dict[all_ids[i]]
+                next_docs.append(doc)
+            context_docs['next'] = next_docs
+            
+            log.info(f"获取文档 {doc_id} 的上下文: 前文{len(prev_docs)}个, 当前1个, 后文{len(next_docs)}个")
+            
+            return context_docs
+            
+        except Exception as e:
+            log.error(f"获取上下文文档失败: {e}")
+            raise e
+
+    def get_document_by_id(self, doc_id: str) -> Optional[Document]:
+        """根据文档ID获取文档"""
+        if self._vector_store is None:
+            raise ValueError("向量存储未初始化，请先添加文档")
+        
+        try:
+            if doc_id in self._vector_store.docstore._dict:
+                return self._vector_store.docstore._dict[doc_id]
+            else:
+                log.warning(f"文档ID '{doc_id}' 不存在")
+                return None
+        except Exception as e:
+            log.error(f"获取文档失败: {e}")
+            raise e
+
+    def get_chapter_sequence(self, doc_id: str, sequence_size: int = 5) -> List[Document]:
+        """
+        获取包含指定文档的章节序列
+        
+        Args:
+            doc_id: 文档ID
+            sequence_size: 序列大小（总共返回多少个章节）
+        
+        Returns:
+            章节序列文档列表
+        """
+        if self._vector_store is None:
+            raise ValueError("向量存储未初始化，请先添加文档")
+
+        try:
+            # 获取所有文档ID（按顺序）
+            all_ids = list(self._vector_store.docstore._dict.keys())
+            
+            if doc_id not in all_ids:
+                raise ValueError(f"文档ID '{doc_id}' 不存在")
+            
+            # 找到当前文档的索引位置
+            current_index = all_ids.index(doc_id)
+            
+            # 计算序列范围（以当前文档为中心）
+            half_size = sequence_size // 2
+            start_index = max(0, current_index - half_size)
+            end_index = min(len(all_ids), start_index + sequence_size)
+            
+            # 如果右边界不够，向左调整
+            if end_index - start_index < sequence_size:
+                start_index = max(0, end_index - sequence_size)
+            
+            # 获取章节序列
+            sequence_docs = []
+            for i in range(start_index, end_index):
+                doc = self._vector_store.docstore._dict[all_ids[i]]
+                sequence_docs.append(doc)
+            
+            log.info(f"获取文档 {doc_id} 的章节序列: {len(sequence_docs)} 个章节")
+            
+            return sequence_docs
+            
+        except Exception as e:
+            log.error(f"获取章节序列失败: {e}")
+            raise e
+
 
 if __name__ == "__main__":
     # 测试命令，根目录路径运行：uv run python -m src.knowledge_qa.vector_store
@@ -679,7 +799,7 @@ if __name__ == "__main__":
     text_processor = TextProcessor()
     documents = text_processor.long_text_novel_split(text)
     vector_store = VectorStore()
-    vector_store.add_documents(documents[:10], batch_size=50)
+    vector_store.add_documents(documents[70:], batch_size=50)
     print(vector_store.get_vector_store_info())
 
     ...
