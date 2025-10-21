@@ -7,10 +7,12 @@ from pathlib import Path
 from langsmith import traceable
 
 from .text_processor import TextProcessor
+from .vector_store import VectorStore
 from .llm import LLM
 from .memory import MemoryManager
 from .file_parser import TextFileParser
 from .log_manager import log
+from .config import settings
 
 
 class KnowledgeQAState(TypedDict):
@@ -28,8 +30,10 @@ class KnowledgeQAAgent:
     """知识库问答Agent"""
 
     def __init__(self, text_processor: Optional[TextProcessor] = None,
+                 vector_store: Optional[VectorStore] = None,
                  llm: Optional[LLM] = None, memory: Optional[MemoryManager] = None):
         self.text_processor = text_processor or TextProcessor()
+        self.vector_store = vector_store or VectorStore()
         self.llm = llm or LLM()
         self.memory = memory or MemoryManager()
 
@@ -128,11 +132,11 @@ class KnowledgeQAAgent:
 
             # 向量化并入库
             log.info("开始向量化并入库")
-            self.text_processor.add_documents(documents, batch_size=10)
+            self.vector_store.add_documents(documents, batch_size=10)
             log.info("向量化入库完成")
 
             # 保存向量库
-            self.text_processor.save_vector_store()
+            self.vector_store.save_vector_store()
             log.info("向量库保存完成")
 
         except Exception as e:
@@ -152,7 +156,7 @@ class KnowledgeQAAgent:
                 state["error"] = "查询内容为空"
                 return state
 
-            context_docs = self.text_processor.similarity_search(query, k=3)
+            context_docs = self.vector_store.similarity_search(query, k=settings.search_k)
             state["context_docs"] = context_docs
 
             log.info(f"检索到 {len(context_docs)} 个相关文档")
