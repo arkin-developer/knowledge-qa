@@ -143,23 +143,24 @@ class StreamlitApp:
         """显示向量库信息"""
         try:
             agent = self._get_agent()
-            vector_store = agent.text_processor.vector_store
+            vector_store = agent.vector_store
 
-            if vector_store is None:
+            if vector_store is None or vector_store._vector_store is None:
                 st.info("📭 向量库未初始化")
                 st.text("请先上传文档")
             else:
                 st.success("✅ 向量库已初始化")
                 try:
-                    doc_count = len(vector_store.docstore._dict) if hasattr(
-                        vector_store, 'docstore') else "未知"
+                    # 使用VectorStore的get_vector_store_info方法获取信息
+                    store_info = vector_store.get_vector_store_info()
+                    doc_count = store_info.get("document_count", "未知")
                     st.metric("文档数量", doc_count)
-                except:
-                    st.text("文档数量: 无法获取")
-
-                persist_path = getattr(vector_store, 'persist_path', None)
-                if persist_path:
-                    st.text(f"存储路径: {persist_path}")
+                    
+                    persist_path = store_info.get("persist_path", None)
+                    if persist_path:
+                        st.text(f"存储路径: {persist_path}")
+                except Exception as e:
+                    st.text(f"文档数量: 无法获取 ({str(e)})")
 
         except Exception as e:
             st.error(f"获取向量库信息失败: {str(e)}")
@@ -187,9 +188,9 @@ class StreamlitApp:
             log.info("✅ Agent 获取成功")
             
             with st.spinner("正在清除向量数据库..."):
-                log.info("🔄 调用 TextProcessor.clear_vector_store()")
-                # 调用 TextProcessor 的清除方法
-                success = agent.text_processor.clear_vector_store()
+                log.info("🔄 调用 VectorStore.clear_vector_store()")
+                # 调用 VectorStore 的清除方法
+                success = agent.vector_store.clear_vector_store()
                 log.info(f"📊 清除操作结果: {'成功' if success else '失败'}")
                 
                 if success:

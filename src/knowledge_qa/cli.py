@@ -144,30 +144,26 @@ class CLI:
         self.console.print()
 
         try:
-            # 尝试获取向量库信息
-            vector_store = self.agent.text_processor.vector_store
+            # 获取向量库信息
+            vector_store = self.agent.vector_store
 
             table = Table(show_header=False, box=None)
             table.add_column("属性", style="cyan")
             table.add_column("值", style="green")
 
-            if vector_store is None:
+            if vector_store is None or vector_store._vector_store is None:
                 table.add_row("状态", "未初始化")
                 table.add_row("文档数量", "0")
             else:
                 table.add_row("状态", "已初始化")
                 try:
-                    # 尝试获取文档数量
-                    doc_count = len(vector_store.docstore._dict) if hasattr(
-                        vector_store, 'docstore') else "未知"
-                    table.add_row("文档数量", str(doc_count))
-                except:
+                    # 使用VectorStore的get_vector_store_info方法获取信息
+                    store_info = vector_store.get_vector_store_info()
+                    table.add_row("文档数量", str(store_info.get("document_count", "未知")))
+                    table.add_row("存储路径", str(store_info.get("persist_path", "未知")))
+                except Exception as e:
                     table.add_row("文档数量", "无法获取")
-
-                # 获取存储路径
-                persist_path = getattr(vector_store, 'persist_path', None)
-                if persist_path:
-                    table.add_row("存储路径", str(persist_path))
+                    table.add_row("错误信息", str(e))
 
             self.console.print(table)
 

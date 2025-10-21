@@ -10,7 +10,7 @@ from .text_processor import TextProcessor
 from .vector_store import VectorStore
 from .llm import LLM
 from .memory import MemoryManager
-from .file_parser import TextFileParser
+from .file_parser import FileParser
 from .log_manager import log
 from .config import settings
 
@@ -102,7 +102,7 @@ class KnowledgeQAAgent:
 
             # 文件处理
             log.info(f"开始解析文件: {file_path}")
-            text = TextFileParser.parse_file(file_path)
+            text = FileParser.parse_file(file_path)
             log.info(f"文件解析完成，文本长度: {len(text)} 字符")
 
             # 文本分段

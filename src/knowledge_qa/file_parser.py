@@ -10,7 +10,7 @@ from langchain_community.document_loaders import (
 )
 
 
-class TextFileParser:
+class FileParser:
     """文本文件解析器"""
 
     @staticmethod
@@ -28,7 +28,7 @@ class TextFileParser:
         loader = PyPDFLoader(file_path)
         docs = loader.load()
         text = "\n".join([doc.page_content for doc in docs])
-        return TextFileParser.strip_text(text)
+        return FileParser.strip_text(text)
 
     @staticmethod
     def parse_docx(file_path: str) -> str:
@@ -36,14 +36,21 @@ class TextFileParser:
         loader = Docx2txtLoader(file_path)
         docs = loader.load()
         text = "\n".join([doc.page_content for doc in docs])
-        return TextFileParser.strip_text(text)
+        return FileParser.strip_text(text)
 
     @staticmethod
     def parse_txt(file_path: str) -> str:
         """解析TXT文件"""
         with open(file_path, 'r', encoding='utf-8') as file:
             text = file.read()
-            return TextFileParser.strip_text(text)
+            return FileParser.strip_text(text)
+
+    @staticmethod
+    def parse_txt_raw(file_path: str) -> str:
+        """解析TXT文件原始内容"""
+        with open(file_path, 'r', encoding='utf-8') as file:
+            text = file.read()
+            return text
 
     @staticmethod
     def parse_md(file_path: str) -> str:
@@ -53,13 +60,13 @@ class TextFileParser:
             loader = UnstructuredMarkdownLoader(file_path)
             docs = loader.load()
             text = "\n".join([doc.page_content for doc in docs])
-            return TextFileParser.strip_text(text)
+            return FileParser.strip_text(text)
         except Exception as e:
             # 如果UnstructuredMarkdownLoader失败，回退到简单文本读取
             print(f"UnstructuredMarkdownLoader失败，使用简单文本读取: {e}")
             with open(file_path, 'r', encoding='utf-8') as file:
                 text = file.read()
-                return TextFileParser.strip_text(text)
+                return FileParser.strip_text(text)
 
     # @staticmethod
     # def parse_csv(file_path: str) -> str:
@@ -72,24 +79,24 @@ class TextFileParser:
     def parse_file(file_path: str) -> str:
         """解析文件"""
         if file_path.endswith('.pdf'):
-            return TextFileParser.parse_pdf(file_path)
+            return FileParser.parse_pdf(file_path)
         elif file_path.endswith('.docx'):
-            return TextFileParser.parse_docx(file_path)
+            return FileParser.parse_docx(file_path)
         elif file_path.endswith('.txt'):
-            return TextFileParser.parse_txt(file_path)
+            return FileParser.parse_txt(file_path)
         elif file_path.endswith('.md'):
-            return TextFileParser.parse_md(file_path)
+            return FileParser.parse_md(file_path)
         else:
             raise ValueError(f"Unsupported file type: {file_path}")
 
 
 if __name__ == "__main__":
     # 测试命令，根目录路径运行：uv run python -m src.knowledge_qa.file_parser
-    txt = TextFileParser.parse_file("examples/三国演义.txt")
+    txt = FileParser.parse_file("examples/三国演义.txt")
     print("txt文件解析测试：", "\n", txt[:1000], "\n")
-    pdf = TextFileParser.parse_file("examples/简历_3页.pdf")
+    pdf = FileParser.parse_file("examples/简历_3页.pdf")
     print("pdf文件解析测试：", "\n", pdf[:1000], "\n")
-    docx = TextFileParser.parse_file("examples/报告_1页.docx")
+    docx = FileParser.parse_file("examples/报告_1页.docx")
     print("docx文件解析测试：", "\n", docx[:1000], "\n")
-    md = TextFileParser.parse_file("examples/简历_3页.md")
+    md = FileParser.parse_file("examples/简历_3页.md")
     print("md文件解析测试：", "\n", md[:1000], "\n")

@@ -157,14 +157,14 @@ class LLM:
 
 
 if __name__ == "__main__":
-    from .file_parser import TextFileParser
+    from .file_parser import FileParser
     from .text_processor import TextProcessor
     from .vector_store import VectorStore
 
     print("知识库问答系统 - 端到端测试\n")
 
     print("1. 加载文档并构建向量库")
-    text = TextFileParser.parse_file("examples/三国演义.txt")
+    text = FileParser.parse_file("examples/三国演义.txt")
     print(f"   文档长度: {len(text)} 字符")
 
     processor = TextProcessor()
