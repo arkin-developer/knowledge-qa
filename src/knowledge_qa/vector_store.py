@@ -679,7 +679,7 @@ if __name__ == "__main__":
     text_processor = TextProcessor()
     documents = text_processor.long_text_novel_split(text)
     vector_store = VectorStore()
-    vector_store.add_documents(documents, batch_size=50)
+    vector_store.add_documents(documents[:10], batch_size=50)
     print(vector_store.get_vector_store_info())
 
     ...
