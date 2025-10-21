@@ -263,9 +263,13 @@ class CLI:
                 self.display_welcome()
                 self.display_menu()
 
-                user_input = Prompt.ask("请选择或直接输入问题", default="0")
+                user_input = Prompt.ask("请选择或直接输入问题")
 
-                if not user_input or user_input == "0":
+                if not user_input:
+                    # 如果直接按回车，显示提示并继续循环
+                    self.console.print("[yellow]💡 请输入选项数字(0-5)或直接输入问题，按Ctrl+C退出[/yellow]")
+                    continue
+                elif user_input == "0":
                     self.console.print("\n[green]👋 再见！[/green]")
                     break
                 elif user_input == "1":
