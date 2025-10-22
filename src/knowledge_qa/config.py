@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     # 向量库配置
     vector_store_path: str
 
+    # 文件上传配置
+    upload_temp_path: str
+
     # 搜索配置
     search_k: int
 
