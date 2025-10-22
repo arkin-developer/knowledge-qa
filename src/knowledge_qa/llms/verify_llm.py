@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from typing import List, Optional
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage, BaseMessage
-from langsmith import traceable
 
 from ..config import settings
 from ..log_manager import log

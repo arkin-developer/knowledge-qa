@@ -2,8 +2,7 @@
 
 from typing import List, Dict, Any, Optional
 from langchain_openai import ChatOpenAI
-from langchain_core.messages import SystemMessage, HumanMessage, BaseMessage
-from langsmith import traceable
+from langchain_core.messages import SystemMessage, HumanMessage, BaseMessage        
 
 from ..config import settings
 from ..log_manager import log
@@ -37,7 +36,6 @@ class QALLM:
 5. 不得编造、推测或添加知识库中不存在的信息。
         """
 
-    @traceable(name="llm_generate")
     def generate(self, query: str, context_docs: List[Any], reader_result: ReaderResult = None) -> Dict[str, Any]:
         """根据知识库上下文回答问题"""
         context_text = "\n\n".join(
@@ -85,7 +83,6 @@ class QALLM:
             log.error(f"回答问题失败: {e}")
             raise e
 
-    @traceable(name="llm_generate_streaming")
     def streaming(self, query: str, context_docs: List[Any]):
         """根据知识库上下文流式回答问题"""
         try:

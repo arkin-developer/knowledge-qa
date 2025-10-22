@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage, BaseMessage
 from langchain_core.tools import tool
-from langsmith import traceable
 
 from ..config import settings
 from ..log_manager import log
