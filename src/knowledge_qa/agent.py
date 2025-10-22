@@ -614,9 +614,11 @@ class KnowledgeQAAgent:
                     # 模拟流式输出，将答案分块输出
                     words = final_answer.split()
                     current_text = ""
-                    for word in words:
+                    for i, word in enumerate(words):
                         current_text += word + " "
-                        yield current_text
+                        # 每5个词输出一次，或者到达最后一个词
+                        if (i + 1) % 5 == 0 or i == len(words) - 1:
+                            yield current_text.strip()
                     
                     # 输出最终的元数据
                     yield {
