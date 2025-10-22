@@ -608,15 +608,24 @@ class KnowledgeQAAgent:
             
             # 流式输出最终结果
             if not state.get("error"):
-                # 使用LLM的流式接口输出最终回答
-                for chunk in self.qa_llm.streaming(query, state["context_docs"]):
-                    if isinstance(chunk, dict):
-                        # 最后的元数据，添加 mode 信息
-                        chunk["mode"] = mode
-                        yield chunk
-                    else:
-                        # 流式文本内容
-                        yield chunk
+                # 直接输出最终生成的答案，而不是重新调用streaming
+                final_answer = state.get("qa_answer", "")
+                if final_answer:
+                    # 模拟流式输出，将答案分块输出
+                    words = final_answer.split()
+                    current_text = ""
+                    for word in words:
+                        current_text += word + " "
+                        yield current_text
+                    
+                    # 输出最终的元数据
+                    yield {
+                        "sources": state.get("sources", []),
+                        "mode": mode,
+                        "full_response": final_answer
+                    }
+                else:
+                    yield {"error": "未生成有效回答", "mode": mode}
             else:
                 yield {"error": state["error"], "mode": mode}
                 
