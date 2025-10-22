@@ -9,11 +9,20 @@ alwaysApply: true
 在编写测试代码时，AI助手必须遵循以下组织规范：
 
 ### 1. 测试文件位置
-- **所有测试必须写在 `tests/` 目录下**
+- **所有“正式测试”必须写在 `tests/` 目录下**
 - **禁止在项目根目录或源代码目录创建测试文件**
 - **严格禁止在 `examples/` 目录创建任何测试脚本或测试代码**
 - **`examples/` 目录仅用于演示和使用示例，不是测试目录**
 - **如果需要测试某个功能，必须在 `tests/unit/` 或 `tests/integration/` 创建测试文件**
+
+### 1.1 模块自测/烟测（uv run）
+- 允许在 `src/` 模块内保留极简“烟测”入口（仅限 `if __name__ == "__main__":` 保护的块）
+- 运行方式统一使用 UV：`uv run python -m <包.模块>`，例如：
+  - `uv run python -m src.knowledge_qa.agent`
+  - `uv run python -m src.knowledge_qa.vector_store`
+  - `uv run python -m src.knowledge_qa.text_processor`
+  - `uv run python -m src.knowledge_qa.file_parser`
+- 烟测仅用于本地快速验证与演示，不替代 `tests/` 下的正式测试；不得在烟测中引入复杂断言框架或重型依赖
 
 ### 2. 单元测试（Unit Tests）
 放置在 `tests/unit/` 目录
@@ -206,21 +215,32 @@ class TestEmbeddingPipelineIntegration:
 ## 运行测试
 
 ```bash
-# 运行所有测试
-pytest
+# 运行所有测试（必须通过 UV）
+uv run pytest
 
 # 只运行单元测试
-pytest tests/unit/
+uv run pytest tests/unit/
 
 # 只运行集成测试
-pytest tests/integration/
+uv run pytest tests/integration/
 
 # 运行特定文件
-pytest tests/unit/test_document_loader.py
+uv run pytest tests/unit/test_document_loader.py
 
 # 运行特定测试方法
-pytest tests/unit/test_document_loader.py::TestDocumentLoader::test_load_pdf
+uv run pytest tests/unit/test_document_loader.py::TestDocumentLoader::test_load_pdf
 
 # 带覆盖率报告
-pytest --cov=src --cov-report=html
+uv run pytest --cov=src --cov-report=html
+```
+
+### 常用烟测命令（仅本地验证）
+```bash
+# Agent 端到端烟测
+uv run python -m src.knowledge_qa.agent
+
+# 文本处理/向量库快速验证
+uv run python -m src.knowledge_qa.text_processor
+uv run python -m src.knowledge_qa.vector_store
+uv run python -m src.knowledge_qa.file_parser
 ```
