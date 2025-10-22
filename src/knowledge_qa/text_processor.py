@@ -115,6 +115,7 @@ class TextProcessor:
         log.info(f"📚 小说按章节分段完成，共 {len(documents)} 个章节")
         return documents
 
+
 if __name__ == "__main__":
     # 测试命令，根目录路径运行：uv run python -m src.knowledge_qa.text_processor
     from .file_parser import FileParser

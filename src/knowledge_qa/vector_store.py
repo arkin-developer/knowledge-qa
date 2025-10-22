@@ -215,18 +215,17 @@ class VectorStore:
         log.info(f"所有文档添加完成，总计 {total_docs} 个文档")
 
     @traceable(name="similarity_search")
-    def similarity_search(self, query: str, k: int = None, filter: Optional[Dict[str, Any]] = None, include_context: bool = True) -> List[Document]:
+    def similarity_search(self, query: str, k: int = None, filter: Optional[Dict[str, Any]] = None) -> List[Document]:
         """
-        相似度搜索，支持自动包含上下文文档
+        相似度搜索
         
         Args:
             query: 搜索查询
             k: 返回结果数量
             filter: 过滤条件
-            include_context: 是否包含每个结果的前后文文档
         
         Returns:
-            文档列表，如果include_context=True，会包含每个匹配文档的前后文
+            文档列表
         """
         if self._vector_store is None:
             raise ValueError("向量存储未初始化，请先添加文档")
@@ -234,63 +233,11 @@ class VectorStore:
         k = k or settings.search_k
         
         # 执行向量相似度搜索
-        base_results = self._vector_store.similarity_search(
+        results = self._vector_store.similarity_search(
             query, k=k, filter=filter)
         
-        if not include_context:
-            log.info(f"搜索完成: 查询='{query[:50]}...', 返回={len(base_results)} 个结果")
-            return base_results
-        
-        # 收集所有相关文档（包括上下文）
-        all_documents = []
-        processed_doc_ids = set()  # 避免重复添加
-        
-        for doc in base_results:
-            # 获取文档ID
-            doc_id = None
-            for id_key, stored_doc in self._vector_store.docstore._dict.items():
-                if stored_doc == doc:
-                    doc_id = id_key
-                    break
-            
-            if doc_id is None:
-                # 如果找不到ID，直接添加原文档
-                if id(doc) not in processed_doc_ids:
-                    all_documents.append(doc)
-                    processed_doc_ids.add(id(doc))
-                continue
-            
-            # 获取上下文文档
-            try:
-                context = self.get_context_documents(doc_id, context_size=1)
-                
-                # 添加前文文档（如果存在且未处理过）
-                for prev_doc in context['previous']:
-                    if id(prev_doc) not in processed_doc_ids:
-                        all_documents.append(prev_doc)
-                        processed_doc_ids.add(id(prev_doc))
-                
-                # 添加当前文档（如果未处理过）
-                for curr_doc in context['current']:
-                    if id(curr_doc) not in processed_doc_ids:
-                        all_documents.append(curr_doc)
-                        processed_doc_ids.add(id(curr_doc))
-                
-                # 添加后文文档（如果存在且未处理过）
-                for next_doc in context['next']:
-                    if id(next_doc) not in processed_doc_ids:
-                        all_documents.append(next_doc)
-                        processed_doc_ids.add(id(next_doc))
-                        
-            except Exception as e:
-                log.warning(f"获取文档 {doc_id} 的上下文失败: {e}")
-                # 如果获取上下文失败，至少添加原文档
-                if id(doc) not in processed_doc_ids:
-                    all_documents.append(doc)
-                    processed_doc_ids.add(id(doc))
-        
-        log.info(f"搜索完成: 查询='{query[:50]}...', 基础结果={len(base_results)} 个, 包含上下文后={len(all_documents)} 个")
-        return all_documents
+        log.info(f"搜索完成: 查询='{query[:50]}...', 返回={len(results)} 个结果")
+        return results
 
     @traceable(name="similarity_search_with_score")
     def similarity_search_with_score(self, query: str, k: int = None, filter: Optional[Dict[str, Any]] = None) -> List[tuple]:
@@ -634,63 +581,6 @@ class VectorStore:
             log.error(f"打印索引信息失败: {e}")
             print(f"错误: {e}")
 
-    def get_context_documents(self, doc_id: str, context_size: int = 1) -> Dict[str, List[Document]]:
-        """
-        根据文档ID获取其上下文文档（前文和后文）
-        
-        Args:
-            doc_id: 文档ID
-            context_size: 上下文文档数量（前后各取多少个）
-        
-        Returns:
-            Dict包含 'previous', 'current', 'next' 三个键的文档列表
-        """
-        if self._vector_store is None:
-            raise ValueError("向量存储未初始化，请先添加文档")
-
-        try:
-            # 获取所有文档ID（按顺序）
-            all_ids = list(self._vector_store.docstore._dict.keys())
-            total_count = len(all_ids)
-            
-            if doc_id not in all_ids:
-                raise ValueError(f"文档ID '{doc_id}' 不存在")
-            
-            # 找到当前文档的索引位置
-            current_index = all_ids.index(doc_id)
-            
-            # 计算上下文范围
-            start_index = max(0, current_index - context_size)
-            end_index = min(total_count, current_index + context_size + 1)
-            
-            # 获取上下文文档
-            context_docs = {}
-            
-            # 前文文档
-            prev_docs = []
-            for i in range(start_index, current_index):
-                doc = self._vector_store.docstore._dict[all_ids[i]]
-                prev_docs.append(doc)
-            context_docs['previous'] = prev_docs
-            
-            # 当前文档
-            current_doc = self._vector_store.docstore._dict[doc_id]
-            context_docs['current'] = [current_doc]
-            
-            # 后文文档
-            next_docs = []
-            for i in range(current_index + 1, end_index):
-                doc = self._vector_store.docstore._dict[all_ids[i]]
-                next_docs.append(doc)
-            context_docs['next'] = next_docs
-            
-            log.info(f"获取文档 {doc_id} 的上下文: 前文{len(prev_docs)}个, 当前1个, 后文{len(next_docs)}个")
-            
-            return context_docs
-            
-        except Exception as e:
-            log.error(f"获取上下文文档失败: {e}")
-            raise e
 
     def get_document_by_id(self, doc_id: str) -> Optional[Document]:
         """根据文档ID获取文档"""
@@ -707,52 +597,6 @@ class VectorStore:
             log.error(f"获取文档失败: {e}")
             raise e
 
-    def get_chapter_sequence(self, doc_id: str, sequence_size: int = 5) -> List[Document]:
-        """
-        获取包含指定文档的章节序列
-        
-        Args:
-            doc_id: 文档ID
-            sequence_size: 序列大小（总共返回多少个章节）
-        
-        Returns:
-            章节序列文档列表
-        """
-        if self._vector_store is None:
-            raise ValueError("向量存储未初始化，请先添加文档")
-
-        try:
-            # 获取所有文档ID（按顺序）
-            all_ids = list(self._vector_store.docstore._dict.keys())
-            
-            if doc_id not in all_ids:
-                raise ValueError(f"文档ID '{doc_id}' 不存在")
-            
-            # 找到当前文档的索引位置
-            current_index = all_ids.index(doc_id)
-            
-            # 计算序列范围（以当前文档为中心）
-            half_size = sequence_size // 2
-            start_index = max(0, current_index - half_size)
-            end_index = min(len(all_ids), start_index + sequence_size)
-            
-            # 如果右边界不够，向左调整
-            if end_index - start_index < sequence_size:
-                start_index = max(0, end_index - sequence_size)
-            
-            # 获取章节序列
-            sequence_docs = []
-            for i in range(start_index, end_index):
-                doc = self._vector_store.docstore._dict[all_ids[i]]
-                sequence_docs.append(doc)
-            
-            log.info(f"获取文档 {doc_id} 的章节序列: {len(sequence_docs)} 个章节")
-            
-            return sequence_docs
-            
-        except Exception as e:
-            log.error(f"获取章节序列失败: {e}")
-            raise e
 
 
 if __name__ == "__main__":
@@ -856,16 +700,28 @@ if __name__ == "__main__":
     # print("测试向量存储的索引类型")
 
     # 凡人修仙传入库
+    # print("="*100)
+    # print("凡人修仙传入库")
+    # print("="*100)
+    # from .text_processor import TextProcessor
+    # from .file_parser import FileParser
+    # text = FileParser.parse_txt_raw("examples/凡人修仙传test.txt")
+    # text_processor = TextProcessor()
+    # documents = text_processor.long_text_novel_split(text)
+    # vector_store = VectorStore()
+    # vector_store.add_documents(documents, batch_size=50)
+    # print(vector_store.get_vector_store_info())
+
+    # 玩家手册入库
     print("="*100)
-    print("凡人修仙传入库")
+    print("玩家手册入库")
     print("="*100)
     from .text_processor import TextProcessor
     from .file_parser import FileParser
-    text = FileParser.parse_txt_raw("examples/凡人修仙传test.txt")
+    text = FileParser.parse_file("examples/Player's Handbook.pdf")
     text_processor = TextProcessor()
-    documents = text_processor.long_text_novel_split(text)
+    documents = text_processor.split_text(text)
     vector_store = VectorStore()
-    vector_store.add_documents(documents[70:], batch_size=50)
-    print(vector_store.get_vector_store_info())
+    vector_store.add_documents(documents, batch_size=50)
 
     ...
