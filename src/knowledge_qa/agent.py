@@ -546,25 +546,83 @@ class KnowledgeQAAgent:
             if not state.get("error"):
                 yield {"status": "正在存储文档...", "type": "status"}
                 state = self._store_document_node(state)
+            # 上传模式直接结束
+            yield {"status": "文档上传完成", "type": "status", "mode": mode}
+            return
 
         # 如果有查询，进行知识检索
         if mode == "query":
             yield {"status": "正在检索相关知识...", "type": "status"}
             state = self._retrieve_context_node(state)
 
-        # 开始生成回答
+        # 开始完整的问答流程
         yield {"status": "正在生成回答...", "type": "status"}
-
-        # 使用LLM的流式接口
+        
+        # 使用完整的LangGraph工作流进行流式处理
         sources = []
-        for chunk in self.qa_llm.streaming(query, state["context_docs"]):
-            if isinstance(chunk, dict):
-                # 最后的元数据，添加 mode 信息
-                chunk["mode"] = mode
-                yield chunk
+        mode = state["mode"]
+        
+        # 执行完整的问答流程
+        try:
+            # 生成初始回答
+            state = self._generate_answer_node(state)
+            
+            if state.get("error"):
+                yield {"error": state["error"], "mode": mode}
+                return
+            
+            # 检查是否完成
+            state = self._check_finished_node(state)
+            
+            if state.get("error"):
+                yield {"error": state["error"], "mode": mode}
+                return
+            
+            # 处理字典格式的返回值
+            finished_state = state.get("finished_state")
+            if isinstance(finished_state, dict):
+                finished = finished_state.get("finished", False)
             else:
-                # 流式文本内容
-                yield chunk
+                finished = finished_state.finished if finished_state else False
+            
+            # 如果未完成，进行Reader搜索和验证
+            if not finished:
+                yield {"status": "正在搜索相关资料...", "type": "status"}
+                state = self._reader_search_node(state)
+                
+                if not state.get("error"):
+                    yield {"status": "正在验证资料...", "type": "status"}
+                    state = self._verify_context_node(state)
+                    
+                    if not state.get("error"):
+                        # 根据验证结果决定是否重新生成回答
+                        verify_state = state.get("verify_state")
+                        if isinstance(verify_state, dict):
+                            satisfied = verify_state.get("satisfied", False)
+                        else:
+                            satisfied = verify_state.satisfied if verify_state else False
+                        
+                        if satisfied:
+                            yield {"status": "正在重新生成回答...", "type": "status"}
+                            state = self._generate_answer_node(state)
+            
+            # 流式输出最终结果
+            if not state.get("error"):
+                # 使用LLM的流式接口输出最终回答
+                for chunk in self.qa_llm.streaming(query, state["context_docs"]):
+                    if isinstance(chunk, dict):
+                        # 最后的元数据，添加 mode 信息
+                        chunk["mode"] = mode
+                        yield chunk
+                    else:
+                        # 流式文本内容
+                        yield chunk
+            else:
+                yield {"error": state["error"], "mode": mode}
+                
+        except Exception as e:
+            log.error(f"流式处理失败: {e}")
+            yield {"error": f"流式处理失败: {str(e)}", "mode": mode}
 
     def clear_memory(self):
         """清空各LLM的记忆"""
