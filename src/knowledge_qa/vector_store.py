@@ -11,7 +11,6 @@ from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain_community.vectorstores.faiss import FAISS as LangChainFAISS
 from langchain_community.docstore import InMemoryDocstore
-from langsmith import traceable
 
 from .config import settings
 from .log_manager import log
@@ -94,7 +93,6 @@ class VectorStore:
 
         return documents
 
-    @traceable(name="create_vector_store")
     def create_vector_store(self, documents: List[Document]) -> FAISS:
         """创建新的向量存储，使用IndexFlatIP索引（适合标准化向量）"""
         if not documents:
@@ -154,7 +152,6 @@ class VectorStore:
             log.info("向量存储创建成功 (使用默认L2距离索引)")
             return self._vector_store
 
-    @traceable(name="add_documents")
     def add_documents(self, documents: List[Document], source_info: Dict[str, Any] = None, batch_size: int = 50) -> None:
         """添加文档到向量存储（分批处理）"""
         if not documents:
@@ -214,7 +211,6 @@ class VectorStore:
 
         log.info(f"所有文档添加完成，总计 {total_docs} 个文档")
 
-    @traceable(name="similarity_search")
     def similarity_search(self, query: str, k: int = None, filter: Optional[Dict[str, Any]] = None) -> List[Document]:
         """
         相似度搜索
@@ -239,7 +235,6 @@ class VectorStore:
         log.info(f"搜索完成: 查询='{query[:50]}...', 返回={len(results)} 个结果")
         return results
 
-    @traceable(name="similarity_search_with_score")
     def similarity_search_with_score(self, query: str, k: int = None, filter: Optional[Dict[str, Any]] = None) -> List[tuple]:
         """带分数的相似度搜索"""
         if self._vector_store is None:

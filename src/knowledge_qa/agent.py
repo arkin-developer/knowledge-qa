@@ -454,6 +454,7 @@ class KnowledgeQAAgent:
 
         return state
 
+    @traceable(name="handle_error_node")
     def _handle_error_node(self, state: KnowledgeQAState) -> KnowledgeQAState:
         """错误处理节点"""
         log.error("执行错误处理")
@@ -589,11 +590,16 @@ if __name__ == "__main__":
     # print(f"   模式: {result_upload['mode']}\n")
 
     print("3. 测试纯查询对话")
-    # query1 = "韩立是如何进入七玄门的？记名弟子初次考验包含哪些关键路段与环节？"
-    # query1 = "墨大夫的真实来历与核心目的是什么？他与韩立关系的转折点发生在哪些事件上？"
-    # query1 = "神手谷中的神秘小瓶具备什么规律与用途？韩立如何验证并应用？"
-    # query1 = "落日峰“死契血斗”前后的关键人物与转折是什么？韩立如何扭转战局？"
+    query1 = "韩立是如何进入七玄门的？记名弟子初次考验包含哪些关键路段与环节？"
+    query1 = "墨大夫的真实来历与核心目的是什么？他与韩立关系的转折点发生在哪些事件上？"
+    query1 = "神手谷中的神秘小瓶具备什么规律与用途？韩立如何验证并应用？"
+    query1 = "落日峰“死契血斗”前后的关键人物与转折是什么？韩立如何扭转战局？"
     query1 = "韩立已系统掌握的法术与其局限是什么？他如何“法武并用”？"
+    # query1 = "人类（Human）的标准种族特性里，能力值（Ability Scores）如何改变？人类还会获得哪些语言？"
+    # query1 = "在战斗中当你使用一次“动作（Action）”时，下面哪项不是标准动作？（A）Dash（冲刺） （B）Disengage（脱离） （C）Dodge（躲闪） （D）Teleport（瞬移）"
+    # query1 = "如果你在某回合用 bonus action（奖励动作）施放了一个法术，你还能在同一回合再施放一个非戏法（cantrip）的法术吗？为什么？"
+    # query1 = "简述短休息（Short Rest）与长休息（Long Rest）的主要区别与效果（至少包含各自持续时间与恢复内容）。"
+    # query1 = "当一个目标处于 Grappled（被擒抱/缠住）状态时，会发生什么？列出该状态对目标的具体机械效果。"
     print(f"   Q: {query1}")
     result1 = agent.chat(query1)
     print(f"   A: {result1['answer']}")
