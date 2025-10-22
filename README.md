@@ -182,21 +182,28 @@ uv run streamlit run src/knowledge_qa/app.py --server.port 8501
 
 ```
 knowledge-qa/
-├── .cursor                   # cursor 编码规则
+├── .cursor/                  # cursor 编码规则
 ├── src/knowledge_qa/         # 核心源代码
 │   ├── agent.py              # LangGraph Agent 主逻辑
 │   ├── app.py                # Streamlit Web 界面
 │   ├── cli.py                # 命令行界面
 │   ├── config.py             # 配置管理
 │   ├── file_parser.py        # 文档解析器
-│   ├── llm.py                # LLM 接口
+│   ├── llms/                 # LLM 模块目录
+│   │   ├── qa_llm.py         # 知识库问答大模型
+│   │   ├── reader_llm.py    # 文档阅读器模型
+│   │   ├── verify_llm.py    # 验证模型
+│   │   └── finished_llm.py  # 完成状态判断模型
 │   ├── log_manager.py        # 日志管理
 │   ├── memory.py             # 对话记忆管理
-│   └── text_processor.py     # 文本处理与向量化
+│   ├── text_processor.py     # 文本处理与向量化
+│   └── vector_store.py       # 向量存储管理
 ├── examples/                 # 示例文档
 ├── data/                     # 数据存储目录
 │   └── faiss_db/            # FAISS 向量数据库
 ├── logs/                     # 日志文件
+├── start_cli.py             # CLI 启动脚本
+├── start_web.py             # Web 启动脚本
 ├── pyproject.toml           # 项目配置与依赖
 ├── uv.lock                  # 依赖锁定文件
 └── README.md                # 项目说明文档
@@ -225,16 +232,16 @@ knowledge-qa/
 uv run python -m src.knowledge_qa.agent
 ```
 
-测试 LLM 功能：
-
-```bash
-uv run python -m src.knowledge_qa.llm
-```
-
 测试文本处理：
 
 ```bash
 uv run python -m src.knowledge_qa.text_processor
+```
+
+测试向量存储：
+
+```bash
+uv run python -m src.knowledge_qa.vector_store
 ```
 
 ## 📄 许可证
