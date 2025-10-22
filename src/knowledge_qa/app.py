@@ -10,6 +10,7 @@ try:
     # 尝试相对导入（当作为模块运行时）
     from .agent import KnowledgeQAAgent
     from .log_manager import log
+    from .config import settings
 except ImportError:
     # 使用绝对导入（当直接运行时）
     import sys
@@ -21,6 +22,7 @@ except ImportError:
 
     from src.knowledge_qa.agent import KnowledgeQAAgent
     from src.knowledge_qa.log_manager import log
+    from src.knowledge_qa.config import settings
 
 
 class StreamlitApp:
@@ -110,8 +112,8 @@ class StreamlitApp:
     def _handle_file_upload(self, uploaded_file):
         """处理文件上传"""
         try:
-            # 保存上传的文件到临时位置
-            temp_path = Path("temp") / uploaded_file.name
+            # 保存上传的文件到配置的临时位置
+            temp_path = Path(settings.upload_temp_path) / uploaded_file.name
             temp_path.parent.mkdir(exist_ok=True)
 
             with open(temp_path, "wb") as f:

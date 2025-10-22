@@ -29,8 +29,8 @@ class ReaderResult:
 class ReaderLLM:
     """阅读本地文件资料的工具模型"""
 
-    def __init__(self, files: str = os.path.join("/Users/arkin/Desktop/Dev/knowledge-qa/temp")):
-        self.files = files
+    def __init__(self, files: str = None):
+        self.files = files or settings.upload_temp_path
         self.llm = ChatOpenAI(
             openai_api_key=settings.siliconcloud_api_key,
             openai_api_base=settings.siliconcloud_api_base,
