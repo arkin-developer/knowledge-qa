@@ -2,6 +2,7 @@
 
 import os
 import sys
+import shutil
 from pathlib import Path
 from typing import Optional
 
@@ -13,6 +14,7 @@ from rich.markdown import Markdown
 
 from .agent import KnowledgeQAAgent
 from .log_manager import log
+from .config import settings
 
 
 class CLI:
@@ -21,6 +23,14 @@ class CLI:
     def __init__(self):
         self.console = Console()
         self.agent = KnowledgeQAAgent()
+        self.temp_upload_dir = Path(settings.upload_temp_path)
+        self._ensure_temp_dir()
+
+    def _ensure_temp_dir(self):
+        """确保临时上传目录存在"""
+        if not self.temp_upload_dir.exists():
+            self.temp_upload_dir.mkdir(parents=True, exist_ok=True)
+            self.console.print(f"[green]✅ 创建临时上传目录: {self.temp_upload_dir}[/green]")
 
     def display_welcome(self):
         """显示欢迎信息"""
@@ -43,6 +53,7 @@ class CLI:
             "3. 查看目前向量存储的数量",
             "4. 清除上下文",
             "5. 流式问答模式",
+            "6. 管理临时上传文件夹",
             "0. 退出"
         ]
 
@@ -58,20 +69,38 @@ class CLI:
         self.console.print("支持格式: PDF, DOCX, Markdown, TXT")
         self.console.print()
         
+        # 显示临时上传文件夹中的文件
+        temp_files = []
+        if self.temp_upload_dir.exists():
+            temp_files = [f for f in self.temp_upload_dir.iterdir() 
+                         if f.is_file() and f.suffix.lower() in ['.pdf', '.docx', '.md', '.txt']]
+        
         # 显示 examples 文件夹中的测试文件
         examples_dir = Path("examples")
+        examples_files = []
         if examples_dir.exists():
-            self.console.print("[bold cyan]📂 可用的测试文件:[/bold cyan]")
-            test_files = []
-            for i, file_path in enumerate(examples_dir.iterdir(), 1):
-                if file_path.is_file() and file_path.suffix.lower() in ['.pdf', '.docx', '.md', '.txt']:
-                    test_files.append(file_path)
-                    self.console.print(f"  [cyan]{i}.[/cyan] {file_path}")
-            
-            if test_files:
-                self.console.print()
-                self.console.print("[dim]💡 提示: 输入数字选择测试文件，或输入完整路径选择其他文件[/dim]")
-                self.console.print()
+            examples_files = [f for f in examples_dir.iterdir() 
+                            if f.is_file() and f.suffix.lower() in ['.pdf', '.docx', '.md', '.txt']]
+        
+        all_files = temp_files + examples_files
+        file_offset = 0
+        
+        if temp_files:
+            self.console.print("[bold cyan]📂 临时上传文件夹中的文件:[/bold cyan]")
+            for i, file_path in enumerate(temp_files, 1):
+                self.console.print(f"  [cyan]{i}.[/cyan] {file_path}")
+            file_offset = len(temp_files)
+            self.console.print()
+        
+        if examples_files:
+            self.console.print("[bold cyan]📂 示例文件夹中的文件:[/bold cyan]")
+            for i, file_path in enumerate(examples_files, 1):
+                self.console.print(f"  [cyan]{i + file_offset}.[/cyan] {file_path}")
+            self.console.print()
+        
+        if all_files:
+            self.console.print("[dim]💡 提示: 输入数字选择文件，或输入完整路径选择其他文件[/dim]")
+            self.console.print()
         
         user_input = Prompt.ask("请输入文件路径或数字")
         
@@ -81,8 +110,8 @@ class CLI:
         # 处理数字选择
         if user_input.isdigit():
             file_index = int(user_input) - 1
-            if 0 <= file_index < len(test_files):
-                file_path = test_files[file_index]
+            if 0 <= file_index < len(all_files):
+                file_path = all_files[file_index]
                 self.console.print(f"[green]已选择: {file_path}[/green]")
             else:
                 self.console.print("[red]❌ 无效的数字选择[/red]")
@@ -102,6 +131,14 @@ class CLI:
             if result.get("mode") == "upload":
                 self.console.print(
                     f"[green]✅ 文档上传成功！模式: {result['mode']}[/green]")
+                
+                # 如果文件不在临时文件夹中，复制到临时文件夹保存
+                if not str(file_path).startswith(str(self.temp_upload_dir)):
+                    temp_file_path = self.temp_upload_dir / file_path.name
+                    shutil.copy2(file_path, temp_file_path)
+                    self.console.print(f"[green]📁 文件已保存到临时文件夹: {temp_file_path}[/green]")
+                else:
+                    self.console.print(f"[green]📁 文件保留在临时文件夹: {file_path}[/green]")
             else:
                 self.console.print(
                     f"[yellow]⚠️ 处理完成，模式: {result.get('mode', 'unknown')}[/yellow]")
@@ -256,6 +293,36 @@ class CLI:
             self.console.print(f"[red]❌ 错误: {str(e)}[/red]")
             log.error(f"查询失败: {str(e)}")
 
+    def handle_manage_temp_folder(self):
+        """管理临时上传文件夹"""
+        self.console.print("\n[bold blue]📁 临时上传文件夹管理[/bold blue]")
+        self.console.print()
+        
+        if not self.temp_upload_dir.exists():
+            self.console.print("[yellow]临时文件夹不存在[/yellow]")
+            return
+        
+        # 显示临时文件夹中的文件
+        temp_files = [f for f in self.temp_upload_dir.iterdir() 
+                     if f.is_file() and f.suffix.lower() in ['.pdf', '.docx', '.md', '.txt']]
+        
+        if not temp_files:
+            self.console.print("[yellow]临时文件夹为空[/yellow]")
+            return
+        
+        self.console.print(f"[green]临时文件夹路径: {self.temp_upload_dir}[/green]")
+        self.console.print(f"[green]文件数量: {len(temp_files)}[/green]")
+        self.console.print()
+        
+        # 显示文件列表
+        for i, file_path in enumerate(temp_files, 1):
+            file_size = file_path.stat().st_size
+            size_str = f"{file_size / 1024:.1f}KB" if file_size < 1024*1024 else f"{file_size / (1024*1024):.1f}MB"
+            self.console.print(f"  [cyan]{i}.[/cyan] {file_path.name} ({size_str})")
+        
+        self.console.print()
+        self.console.print("[dim]💡 提示: 文件已永久保存在临时文件夹中，不会自动删除[/dim]")
+
     def run(self):
         """运行CLI"""
         try:
@@ -282,13 +349,15 @@ class CLI:
                     self.handle_clear_context()
                 elif user_input == "5":
                     self.handle_streaming_query()
+                elif user_input == "6":
+                    self.handle_manage_temp_folder()
                 elif user_input in ["exit", "quit", "q"]:
                     self.console.print("\n[green]👋 再见！[/green]")
                     break
                 else:
                     # 检查是否为纯数字
                     if user_input.isdigit():
-                        self.console.print("[red]❌ 无效选项，请输入 0-5 之间的数字[/red]")
+                        self.console.print("[red]❌ 无效选项，请输入 0-6 之间的数字[/red]")
                     else:
                         self.console.print(f"\n[dim]你的问题: {user_input}[/dim]")
                         self.handle_direct_query(user_input)

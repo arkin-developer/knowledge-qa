@@ -21,6 +21,21 @@ def main():
         print("⚠️  警告: 未找到 .env 文件，请确保已配置环境变量")
         print("参考 README.md 中的配置说明")
     
+    # 确保临时上传文件夹存在
+    try:
+        from src.knowledge_qa.config import settings
+        temp_dir = Path(settings.upload_temp_path)
+        if not temp_dir.exists():
+            temp_dir.mkdir(parents=True, exist_ok=True)
+            print(f"✅ 创建临时上传文件夹: {temp_dir}")
+    except Exception as e:
+        print(f"⚠️  警告: 无法读取临时文件夹配置: {e}")
+        # 使用默认路径作为后备
+        temp_dir = Path("temp")
+        if not temp_dir.exists():
+            temp_dir.mkdir(parents=True, exist_ok=True)
+            print(f"✅ 创建默认临时上传文件夹: {temp_dir}")
+    
     print("🎯 启动 CLI 界面...")
     print("=" * 50)
     
