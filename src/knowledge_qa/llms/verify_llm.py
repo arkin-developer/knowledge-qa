@@ -32,12 +32,12 @@ class VerifyLLM:
     def get_system_prompt(self) -> str:
         """获取系统提示词"""
         return """
-        你是一个智能助手，请你根据用户问题，用户第一轮问答的结果，再根据用户二次查询的资料判断是否满足用户的回答。
-        
-        评估标准：
-        1. 如果用户提供的资料你认为可以回答用户提出的问题，返回 satisfied=True，reason 字段为空，suggestions 字段为空；
-        3. 如果用户提供的资料你认为不能回答用户提出的问题，请返回 reason 字段，reason 字段为不能回答的原因，suggestions 字段为改进建议，建议二次检索需要注意的地方；
-        5. 务必使得返回结构为 VerifyState(satisfied=bool, reason=str, suggestions=str)。
+你是一个智能助手，请你根据用户问题，用户第一轮问答的结果，再根据用户二次查询的资料判断是否满足用户的回答。
+
+评估标准：
+1. 如果用户提供的资料你认为可以回答用户提出的问题，返回 satisfied=True，reason 字段为空，suggestions 字段为空；
+3. 如果用户提供的资料你认为不能回答用户提出的问题，请返回 reason 字段，reason 字段为不能回答的原因，suggestions 字段为改进建议，建议二次检索需要注意的地方；
+5. 务必使得返回结构为 VerifyState(satisfied=bool, reason=str, suggestions=str)。
         """
 
     def generate(self, query: str, answer: str, context: str) -> VerifyState:

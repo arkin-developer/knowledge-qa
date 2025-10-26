@@ -7,7 +7,7 @@ from langchain_core.messages import SystemMessage, HumanMessage, BaseMessage
 from ..config import settings
 from ..log_manager import log
 from ..memory import MemoryManager
-from .reader_llm import ReaderResult
+from ..llms.reader_llm import DocumentFragment
 
 
 class QALLM:
@@ -36,16 +36,16 @@ class QALLM:
 5. 不得编造、推测或添加知识库中不存在的信息。
         """
 
-    def generate(self, query: str, context_docs: List[Any], reader_result: ReaderResult = None) -> Dict[str, Any]:
+    def generate(self, query: str, context_docs: List[Any] | List[DocumentFragment]) -> Dict[str, Any]:
         """根据知识库上下文回答问题"""
         context_text = "\n\n".join(
             [f"{i+1}. {doc.page_content}" for i, doc in enumerate(context_docs)])
 
-        if reader_result and hasattr(reader_result, 'fragments') and reader_result.fragments:
+        if context_docs and hasattr(context_docs, 'fragments') and context_docs.fragments:
             # 如果reader模型查询到了资料，则将资料合并向量数据库查询到的信息一起加入到上下文信息中
             context_text = "\n\n".join([
-                f"{i+1}. {fragment.content}" for i, fragment in enumerate(reader_result.fragments)] +
-                [f"{len(reader_result.fragments)+i+1}. {doc.page_content}" for i, doc in enumerate(context_docs)])
+                f"{i+1}. {fragment.content}" for i, fragment in enumerate(context_docs.fragments)] +
+                [f"{len(context_docs.fragments)+i+1}. {doc.page_content}" for i, doc in enumerate(context_docs)])
 
         user_prompt = f"上下文信息：{context_text}\n 用户问题：{query}"
 
