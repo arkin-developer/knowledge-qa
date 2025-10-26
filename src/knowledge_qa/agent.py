@@ -1,13 +1,11 @@
 """ 知识库问答agent """
 
-from pydantic import BaseModel
 from typing import List, Dict, Any, Optional, TypedDict
-from langchain_core.documents import Document
 from langgraph.graph import StateGraph, END
 from pathlib import Path
 from langsmith import traceable
 
-from .text_processor import TextProcessor
+from .text_processor import TextProcessor   
 from .file_parser import FileParser
 from .vector_store import VectorStore
 from .llms.reader_llm import ReaderLLM, DocumentFragment
@@ -18,7 +16,6 @@ from .log_manager import log
 from .config import settings
 
 
-# 知识库问答状态
 class KnowledgeQAState(TypedDict):
     """知识库问答状态"""
     query: str  # 用户的原始问题
@@ -30,8 +27,6 @@ class KnowledgeQAState(TypedDict):
     finished_state: Optional[FinishedState]  # 判断 query 是否回答完成
     refine_suggestions: Optional[str]  # 验证模型给出的建议，可以传入reader模型进行二次检索
     error: Optional[str]  # 错误信息，如果发生错误，则需要处理错误
-
-# 知识库问答Agent
 
 
 class KnowledgeQAAgent:
@@ -65,10 +60,19 @@ class KnowledgeQAAgent:
         workflow.add_node("refine", self._refine_node)  # 验证材料是否能够完成用户问题节点
         workflow.add_node("handle_error", self._handle_error_node)  # 错误处理节点
 
-        # 设置入口点
-        workflow.set_entry_point("retrieve_vector_docs")
+        # 设置入口点 - 根据mode决定
+        workflow.set_entry_point("process_file")
 
         # 设置条件路由
+        workflow.add_conditional_edges(
+            "process_file",
+            self._file_processing_decision,
+            {
+                "retrieve": "retrieve_vector_docs",
+                "end": END
+            }
+        )
+
         workflow.add_conditional_edges(
             "finished",
             self._should_continue,
@@ -89,14 +93,28 @@ class KnowledgeQAAgent:
         )
 
         # 静态边连接
-        # 向量数据库检索节点 -> QA答案生成节点
-        workflow.add_edge("retrieve_vector_docs", "qa")
+        workflow.add_edge("retrieve_vector_docs", "qa")  # 向量数据库检索节点 -> QA答案生成节点
         workflow.add_edge("qa", "finished")  # QA答案生成节点 -> 完成检查节点
         workflow.add_edge("reader", "refine")  # 阅读本地文档节点 -> 验证材料是否能够完成用户问题节点
         workflow.add_edge("handle_error", END)  # 错误处理节点 -> 结束
 
         return workflow
 
+    @traceable(name="file_processing_decision")
+    def _file_processing_decision(self, state: KnowledgeQAState | Dict[str, Any]) -> str:
+        """文件处理决策"""
+        if state.get("error"):
+            return "end"
+        
+        mode = state.get("mode", "query")
+        if mode == "upload":
+            # 上传模式：处理文件后继续检索
+            return "retrieve"
+        else:
+            # 查询模式：直接跳过文件处理，进入检索
+            return "retrieve"
+
+    @traceable(name="should_continue")
     def _should_continue(self, state: KnowledgeQAState | Dict[str, Any]) -> str:
         """判断是否需要继续处理"""
         if state.get("error"):
@@ -109,11 +127,12 @@ class KnowledgeQAAgent:
                 finished = finished_state.get("finished", False)
             else:
                 finished = finished_state.finished
-            
+
             if finished:
                 return "end"
         return "continue"
 
+    @traceable(name="refine_decision")
     def _refine_decision(self, state: KnowledgeQAState | Dict[str, Any]) -> str:
         """refine节点的路由决策"""
         if state.get("error"):
@@ -126,34 +145,57 @@ class KnowledgeQAAgent:
                 enough = refine_state.get("enough", False)
             else:
                 enough = refine_state.enough
-            
+
             if enough:
                 return "back_to_qa"
             else:
                 return "continue_reader"
         return "end"
 
+    @traceable(name="chat")
+    def chat(self, query: str, file_path: Optional[str] = None) -> Dict[str, Any]:
+        """对话接口"""
+        return self.app.invoke({
+            "query": query,
+            "mode": "upload" if file_path else "query",
+            "file_path": file_path if file_path else None
+        })
+
+    @traceable(name="process_file_node")
     def _process_file_node(self, state: KnowledgeQAState | Dict[str, Any]) -> KnowledgeQAState:
         """文件处理节点"""
         log.info("执行文件处理")
 
         try:
-            file_path = state.get("file_path")
-            if not file_path or not Path(file_path).exists():
-                state["error"] = "文件不存在或路径无效"
-                return state
-            text = FileParser.parse_file(file_path)
-            documents = self.text_processor.split_text(text)
-            if not documents:
-                state["error"] = "没有可分段的文档"
-                return state
-            self.vector_store.add_documents(documents, batch_size=20)
-            self.vector_store.save_vector_store()
-            log.info("文件处理完成")
+            mode = state.get("mode", "query")
+            
+            if mode == "upload":
+                # 上传模式：处理文件
+                file_path = state.get("file_path")
+                if not file_path or not Path(file_path).exists():
+                    state["error"] = "文件不存在或路径无效"
+                    return state
+                
+                text = FileParser.parse_file(file_path)
+                documents = self.text_processor.split_text(text)
+                if not documents:
+                    state["error"] = "没有可分段的文档"
+                    return state
+                
+                self.vector_store.add_documents(documents, batch_size=20)
+                self.vector_store.save_vector_store()
+                log.info("文件处理完成")
+            else:
+                # 查询模式：跳过文件处理
+                log.info("查询模式，跳过文件处理")
+                
         except Exception as e:
             log.error(f"文件处理失败: {e}")
             state["error"] = f"文件处理失败: {str(e)}"
 
+        return state
+
+    @traceable(name="retrieve_vector_docs_node")
     def _retrieve_vector_docs_node(self, state: KnowledgeQAState | Dict[str, Any]) -> KnowledgeQAState:
         """向量数据库检索节点"""
         log.info("执行上下文检索")
@@ -174,6 +216,7 @@ class KnowledgeQAAgent:
 
         return state
 
+    @traceable(name="qa_node")
     def _qa_node(self, state: KnowledgeQAState | Dict[str, Any]) -> KnowledgeQAState:
         """QA答案生成节点"""
         log.info("执行答案生成")
@@ -192,13 +235,15 @@ class KnowledgeQAAgent:
                     if hasattr(fragment, 'content'):
                         context_docs.append(Document(
                             page_content=fragment.content,
-                            metadata={"filename": fragment.filename, "start_line": fragment.start_line, "end_line": fragment.end_line}
+                            metadata={"filename": fragment.filename,
+                                      "start_line": fragment.start_line, "end_line": fragment.end_line}
                         ))
                     else:
                         # 处理字典格式
                         context_docs.append(Document(
                             page_content=fragment.get('content', ''),
-                            metadata={"filename": fragment.get('filename', ''), "start_line": fragment.get('start_line', 0), "end_line": fragment.get('end_line', 0)}
+                            metadata={"filename": fragment.get('filename', ''), "start_line": fragment.get(
+                                'start_line', 0), "end_line": fragment.get('end_line', 0)}
                         ))
             else:
                 context_docs = vector_docs
@@ -212,6 +257,7 @@ class KnowledgeQAAgent:
 
         return state
 
+    @traceable(name="finished_node")
     def _finished_node(self, state: KnowledgeQAState | Dict[str, Any]) -> KnowledgeQAState:
         """完成检查节点"""
         log.info("执行完成检查")
@@ -224,7 +270,7 @@ class KnowledgeQAAgent:
                 qa_answer_text = qa_answer.reason or ""
             else:
                 qa_answer_text = str(qa_answer) if qa_answer else ""
-            
+
             if not query or not query.strip() or not qa_answer_text or not qa_answer_text.strip():
                 state["error"] = "查询内容为空"
                 return state
@@ -238,32 +284,37 @@ class KnowledgeQAAgent:
 
         return state
 
+    @traceable(name="reader_node")
     def _reader_node(self, state: KnowledgeQAState | Dict[str, Any]) -> KnowledgeQAState:
         """阅读本地文档节点"""
         log.info("执行阅读本地文档")
 
         try:
             query = state.get("query")
-            if not query or not query.strip():
-                state["error"] = "查询内容为空"
-                return state
+            suggestions = state.get("suggestions")
+            # 如果存在改进建议，证明不是第一次查询资料
+            if suggestions:
+                log.info(f"存在改进建议，使用改进建议进行二次检索: {suggestions}")
+                query = suggestions
+   
             self.reader_llm.clear_fragments_meta()  # 清空文档片段元数据列表
             _ = self.reader_llm.generate(query)  # 等待执行补充文档片段
             self.reader_llm.update_fragments()  # 更新文档片段列表,获取完整文档片段
-            fragments = self.reader_llm.get_fragments()
+            fragments = self.reader_llm.get_fragments() # 获取完整文档片段
             if not fragments or len(fragments) == 0:
                 state["error"] = "没有找到相关文档片段"
                 return state
             if state.get("document_fragments") is None:
                 state["document_fragments"] = []
-            state["document_fragments"].extend(
-                fragments)  # 这里采取追加的方式，因为可能多次查询，多次追加
+            # 追加文档
+            state["document_fragments"].extend(fragments)  
         except Exception as e:
             log.error(f"阅读本地文档失败: {e}")
             state["error"] = f"阅读本地文档失败: {str(e)}"
             state["document_fragments"] = []
         return state
 
+    @traceable(name="refine_node")
     def _refine_node(self, state: KnowledgeQAState | Dict[str, Any]) -> KnowledgeQAState:
         """验证模型给出的建议节点"""
         log.info("执行验证材料是否能够完成用户问题")
@@ -282,12 +333,13 @@ class KnowledgeQAAgent:
                 else:
                     # 处理字典格式
                     context_text += f"文件: {fragment.get('filename', '')}\n行号: {fragment.get('start_line', '')}-{fragment.get('end_line', '')}\n内容: {fragment.get('content', '')}\n\n"
-            
+
             refine_state = self.refine_llm.generate(query, context_text)
             state["refine_state"] = refine_state
             # 处理字典格式的状态
             if isinstance(refine_state, dict):
-                state["refine_suggestions"] = refine_state.get("suggestions", "")
+                state["refine_suggestions"] = refine_state.get(
+                    "suggestions", "")
             else:
                 state["refine_suggestions"] = refine_state.suggestions
         except Exception as e:
@@ -297,6 +349,7 @@ class KnowledgeQAAgent:
 
         return state
 
+    @traceable(name="handle_error_node")
     def _handle_error_node(self, state: KnowledgeQAState | Dict[str, Any]) -> KnowledgeQAState:
         """错误处理节点"""
         log.error(f"处理错误: {state.get('error')}")
@@ -305,9 +358,40 @@ class KnowledgeQAAgent:
 
 # 测试命令，根目录路径运行：uv run python -m src.knowledge_qa.agent
 if __name__ == "__main__":
-    agent = KnowledgeQAAgent()
-    state = agent.app.invoke({
-        "query": "一个目标处于 Grappled（被擒抱/缠住）状态时，会发生什么？列出该状态对目标的具体机械效果。"
-    })
-    print(state)
+    kb_agent = KnowledgeQAAgent()
+    
+    # 测试查询模式
 
+    # 测试上传模式（如果有文件的话）
+    # print("=== 上传模式测试 ===")
+    # state = agent.app.invoke({
+    #     "query": "测试查询",
+    #     "mode": "upload",
+    #     "file_path": "examples/Player's Handbook.md"
+    # })
+    # print("上传结果:", state.get("qa_answer", "无答案"))
+
+    # 测试RAG 10题
+    answer = kb_agent.chat("韩立是如何进入七玄门的？记名弟子初次考验包含哪些关键路段与环节？")
+    kb_agent.qa_llm.clear_memory()
+    answer = kb_agent.chat("墨大夫的真实来历与核心目的是什么？他与韩立关系的转折点发生在哪些事件上？")
+    kb_agent.qa_llm.clear_memory()
+    answer = kb_agent.chat("神手谷中的神秘小瓶具备什么规律与用途？韩立如何验证并应用？")
+    kb_agent.qa_llm.clear_memory()
+    answer = kb_agent.chat("落日峰“死契血斗”前后的关键人物与转折是什么？韩立如何扭转战局？")    
+    kb_agent.qa_llm.clear_memory()
+    answer = kb_agent.chat("韩立已系统掌握的法术与其局限是什么？他如何“法武并用”？")
+    kb_agent.qa_llm.clear_memory()
+    
+    answer = kb_agent.chat("人类（Human）的标准种族特性里，能力值（Ability Scores）如何改变？人类还会获得哪些语言？")
+    kb_agent.qa_llm.clear_memory()
+    answer = kb_agent.chat("在战斗中当你使用一次“动作（Action）”时，下面哪项不是标准动作？（A）Dash（冲刺） （B）Disengage（脱离） （C）Dodge（躲闪） （D）Teleport（瞬移）")
+    kb_agent.qa_llm.clear_memory()
+    answer = kb_agent.chat("如果你在某回合用 bonus action（奖励动作）施放了一个法术，你还能在同一回合再施放一个非戏法（cantrip）的法术吗？为什么？")
+    kb_agent.qa_llm.clear_memory()
+    answer = kb_agent.chat("简述短休息（Short Rest）与长休息（Long Rest）的主要区别与效果（至少包含各自持续时间与恢复内容）。")
+    kb_agent.qa_llm.clear_memory()
+    answer = kb_agent.chat("当一个目标处于 Grappled（被擒抱/缠住）状态时，会发生什么？列出该状态对目标的具体机械效果。")
+    kb_agent.qa_llm.clear_memory()
+
+    print(answer)
