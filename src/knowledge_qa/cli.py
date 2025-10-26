@@ -240,11 +240,14 @@ class CLI:
 
                 sources = []
                 mode = None
+                document_fragments = []
+                vector_docs = []
 
                 for chunk in self.agent.chat_streaming(query):
                     if isinstance(chunk, dict):
                         # 最后的元数据
-                        sources = chunk.get("sources", [])
+                        document_fragments = chunk.get("document_fragments", [])
+                        vector_docs = chunk.get("vector_docs", [])
                         mode = chunk.get("mode", "unknown")
                     else:
                         # 流式文本内容
@@ -252,12 +255,45 @@ class CLI:
 
                 self.console.print()  # 换行
 
+                # 优先显示 document_fragments，如果没有则显示 vector_docs
+                if document_fragments and len(document_fragments) > 0:
+                    sources = []
+                    for i, fragment in enumerate(document_fragments, 1):
+                        if hasattr(fragment, 'content'):
+                            content = fragment.content[:100] + "..." if len(fragment.content) > 100 else fragment.content
+                            sources.append({
+                                "index": i,
+                                "content": content,
+                                "filename": fragment.filename,
+                                "lines": f"{fragment.start_line}-{fragment.end_line}"
+                            })
+                        else:
+                            # 处理字典格式
+                            content = fragment.get('content', '')[:100] + "..." if len(fragment.get('content', '')) > 100 else fragment.get('content', '')
+                            sources.append({
+                                "index": i,
+                                "content": content,
+                                "filename": fragment.get('filename', ''),
+                                "lines": f"{fragment.get('start_line', '')}-{fragment.get('end_line', '')}"
+                            })
+                elif vector_docs and len(vector_docs) > 0:
+                    sources = []
+                    for i, doc in enumerate(vector_docs, 1):
+                        content = doc.page_content[:100] + "..." if len(doc.page_content) > 100 else doc.page_content
+                        sources.append({
+                            "index": i,
+                            "content": content,
+                            "filename": doc.metadata.get('filename', '未知'),
+                            "lines": f"{doc.metadata.get('start_line', '')}-{doc.metadata.get('end_line', '')}" if doc.metadata.get('start_line') else "未知"
+                        })
+
                 if sources:
                     self.console.print(f"\n[bold cyan]📚 引用来源 (共{len(sources)}条):[/bold cyan]")
                     for source in sources:
-                        content = source.get("content", "")[:100]
                         self.console.print(
-                            f"  [cyan][{source.get('index')}][/cyan] {content}...")
+                            f"  [cyan][{source['index']}][/cyan] {source['content']}")
+                        if source.get('filename'):
+                            self.console.print(f"    [dim]文件: {source['filename']} 行号: {source['lines']}[/dim]")
 
                 self.console.print(f"\n[dim]模式: {mode}[/dim]")
 
@@ -275,16 +311,54 @@ class CLI:
                 result = self.agent.chat(query)
 
             self.console.print("\n[bold blue]🤖 AI助手[/bold blue]")
-            answer = result.get("answer", "无法生成回答")
+            answer = result.get("qa_answer", "无法生成回答")
             self.console.print(Markdown(answer))
 
-            sources = result.get("sources", [])
+            # 优先显示 document_fragments，如果没有则显示 vector_docs
+            document_fragments = result.get("document_fragments", [])
+            vector_docs = result.get("vector_docs", [])
+            
+            sources = []
+            if document_fragments and len(document_fragments) > 0:
+                # 显示 document_fragments
+                sources = []
+                for i, fragment in enumerate(document_fragments, 1):
+                    if hasattr(fragment, 'content'):
+                        content = fragment.content[:100] + "..." if len(fragment.content) > 100 else fragment.content
+                        sources.append({
+                            "index": i,
+                            "content": content,
+                            "filename": fragment.filename,
+                            "lines": f"{fragment.start_line}-{fragment.end_line}"
+                        })
+                    else:
+                        # 处理字典格式
+                        content = fragment.get('content', '')[:100] + "..." if len(fragment.get('content', '')) > 100 else fragment.get('content', '')
+                        sources.append({
+                            "index": i,
+                            "content": content,
+                            "filename": fragment.get('filename', ''),
+                            "lines": f"{fragment.get('start_line', '')}-{fragment.get('end_line', '')}"
+                        })
+            elif vector_docs and len(vector_docs) > 0:
+                # 显示 vector_docs
+                sources = []
+                for i, doc in enumerate(vector_docs, 1):
+                    content = doc.page_content[:100] + "..." if len(doc.page_content) > 100 else doc.page_content
+                    sources.append({
+                        "index": i,
+                        "content": content,
+                        "filename": doc.metadata.get('filename', '未知'),
+                        "lines": f"{doc.metadata.get('start_line', '')}-{doc.metadata.get('end_line', '')}" if doc.metadata.get('start_line') else "未知"
+                    })
+            
             if sources:
                 self.console.print(f"\n[bold cyan]📚 引用来源 (共{len(sources)}条):[/bold cyan]")
                 for source in sources:
-                    content = source.get("content", "")[:100]
                     self.console.print(
-                        f"  [cyan][{source.get('index')}][/cyan] {content}...")
+                        f"  [cyan][{source['index']}][/cyan] {source['content']}")
+                    if source.get('filename'):
+                        self.console.print(f"    [dim]文件: {source['filename']} 行号: {source['lines']}[/dim]")
 
             self.console.print(
                 f"\n[dim]模式: {result.get('mode', 'unknown')}[/dim]")
