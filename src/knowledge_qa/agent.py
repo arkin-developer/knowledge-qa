@@ -117,8 +117,16 @@ class KnowledgeQAAgent:
     @traceable(name="should_continue")
     def _should_continue(self, state: KnowledgeQAState | Dict[str, Any]) -> str:
         """判断是否需要继续处理"""
-        if state.get("error"):
+        # 检查是否有严重错误（非临时性错误）
+        error = state.get("error")
+        if error and self._is_critical_error(error):
+            log.error(f"严重错误，终止流程: {error}")
             return "end"
+        
+        # 清除非严重错误，继续处理
+        if error and not self._is_critical_error(error):
+            log.warning(f"非严重错误，清除后继续: {error}")
+            state["error"] = None
 
         finished_state = state.get("finished_state")
         if finished_state:
@@ -135,8 +143,16 @@ class KnowledgeQAAgent:
     @traceable(name="refine_decision")
     def _refine_decision(self, state: KnowledgeQAState | Dict[str, Any]) -> str:
         """refine节点的路由决策"""
-        if state.get("error"):
+        # 检查是否有严重错误
+        error = state.get("error")
+        if error and self._is_critical_error(error):
+            log.error(f"严重错误，终止流程: {error}")
             return "end"
+        
+        # 清除非严重错误，继续处理
+        if error and not self._is_critical_error(error):
+            log.warning(f"非严重错误，清除后继续: {error}")
+            state["error"] = None
 
         refine_state = state.get("refine_state")
         if refine_state:
@@ -147,19 +163,39 @@ class KnowledgeQAAgent:
                 enough = refine_state.enough
 
             if enough:
+                log.info("材料验证通过，回到QA节点重新生成答案")
                 return "back_to_qa"
             else:
+                log.info("材料不足，继续reader节点获取更多材料")
                 return "continue_reader"
-        return "end"
+        else:
+            log.warning("没有refine_state，结束流程")
+            return "end"
+    
+    def _is_critical_error(self, error: str) -> bool:
+        """判断是否为严重错误"""
+        critical_errors = [
+            "文件不存在或路径无效",
+            "查询内容为空",
+            "没有可分段的文档"
+        ]
+        return any(critical in error for critical in critical_errors)
 
     @traceable(name="chat")
     def chat(self, query: str, file_path: Optional[str] = None) -> Dict[str, Any]:
         """对话接口"""
-        return self.app.invoke({
+        result = self.app.invoke({
             "query": query,
             "mode": "upload" if file_path else "query",
             "file_path": file_path if file_path else None
         })
+        # 保存最后的状态用于调试
+        self._last_state = result
+        return result.get("qa_answer")
+    
+    def get_last_state(self) -> Dict[str, Any]:
+        """获取最后一次执行的状态"""
+        return getattr(self, '_last_state', {})
 
     @traceable(name="process_file_node")
     def _process_file_node(self, state: KnowledgeQAState | Dict[str, Any]) -> KnowledgeQAState:
@@ -297,17 +333,44 @@ class KnowledgeQAAgent:
                 log.info(f"存在改进建议，使用改进建议进行二次检索: {suggestions}")
                 query = suggestions
    
-            self.reader_llm.clear_fragments_meta()  # 清空文档片段元数据列表
-            _ = self.reader_llm.generate(query)  # 等待执行补充文档片段
-            self.reader_llm.update_fragments()  # 更新文档片段列表,获取完整文档片段
-            fragments = self.reader_llm.get_fragments() # 获取完整文档片段
+            # 重试机制：如果查不到内容，允许重试两次
+            max_retries = 3
+            fragments = []
+            
+            for attempt in range(max_retries):
+                try:
+                    self.reader_llm.clear_fragments_meta()  # 清空文档片段元数据列表
+                    _ = self.reader_llm.generate(query)  # 等待执行补充文档片段
+                    self.reader_llm.update_fragments()  # 更新文档片段列表,获取完整文档片段
+                    fragments = self.reader_llm.get_fragments() # 获取完整文档片段
+                    log.info(f"fragments: {fragments}")
+                    
+                    if fragments and len(fragments) > 0:
+                        log.info(f"第 {attempt + 1} 次尝试成功获取 {len(fragments)} 个文档片段")
+                        break
+                    else:
+                        log.warning(f"第 {attempt + 1} 次尝试未找到文档片段")
+                        if attempt < max_retries - 1:
+                            import time
+                            time.sleep(1)  # 等待1秒后重试
+                        
+                except Exception as retry_e:
+                    log.warning(f"第 {attempt + 1} 次尝试失败: {retry_e}")
+                    if attempt < max_retries - 1:
+                        import time
+                        time.sleep(1)  # 等待1秒后重试
+                    else:
+                        raise retry_e
+            
             if not fragments or len(fragments) == 0:
-                state["error"] = "没有找到相关文档片段"
-                return state
+                log.warning("多次尝试后仍未找到文档片段，继续处理")
+                fragments = []
+                
             if state.get("document_fragments") is None:
                 state["document_fragments"] = []
             # 追加文档
             state["document_fragments"].extend(fragments)  
+            log.info(f"document_fragments: 目前文档数量: {len(state.get('document_fragments'))}")
         except Exception as e:
             log.error(f"阅读本地文档失败: {e}")
             state["error"] = f"阅读本地文档失败: {str(e)}"
@@ -336,12 +399,18 @@ class KnowledgeQAAgent:
 
             refine_state = self.refine_llm.generate(query, context_text)
             state["refine_state"] = refine_state
+            log.info(f"refine_state: {refine_state}")
             # 处理字典格式的状态
             if isinstance(refine_state, dict):
-                state["refine_suggestions"] = refine_state.get(
-                    "suggestions", "")
+                enough = refine_state.get("enough", False)
+                suggestions = refine_state.get("suggestions", "")
+                state["refine_suggestions"] = suggestions
+                log.info(f"材料验证结果: enough={enough}, suggestions={suggestions}")
             else:
-                state["refine_suggestions"] = refine_state.suggestions
+                enough = refine_state.enough
+                suggestions = refine_state.suggestions
+                state["refine_suggestions"] = suggestions
+                log.info(f"材料验证结果: enough={enough}, suggestions={suggestions}")
         except Exception as e:
             log.error(f"验证材料是否能够完成用户问题失败: {e}")
             state["error"] = f"验证材料是否能够完成用户问题失败: {str(e)}"
@@ -372,26 +441,66 @@ if __name__ == "__main__":
     # print("上传结果:", state.get("qa_answer", "无答案"))
 
     # 测试RAG 10题
-    answer = kb_agent.chat("韩立是如何进入七玄门的？记名弟子初次考验包含哪些关键路段与环节？")
-    kb_agent.qa_llm.clear_memory()
-    answer = kb_agent.chat("墨大夫的真实来历与核心目的是什么？他与韩立关系的转折点发生在哪些事件上？")
-    kb_agent.qa_llm.clear_memory()
-    answer = kb_agent.chat("神手谷中的神秘小瓶具备什么规律与用途？韩立如何验证并应用？")
-    kb_agent.qa_llm.clear_memory()
-    answer = kb_agent.chat("落日峰“死契血斗”前后的关键人物与转折是什么？韩立如何扭转战局？")    
-    kb_agent.qa_llm.clear_memory()
-    answer = kb_agent.chat("韩立已系统掌握的法术与其局限是什么？他如何“法武并用”？")
-    kb_agent.qa_llm.clear_memory()
-    
-    answer = kb_agent.chat("人类（Human）的标准种族特性里，能力值（Ability Scores）如何改变？人类还会获得哪些语言？")
-    kb_agent.qa_llm.clear_memory()
-    answer = kb_agent.chat("在战斗中当你使用一次“动作（Action）”时，下面哪项不是标准动作？（A）Dash（冲刺） （B）Disengage（脱离） （C）Dodge（躲闪） （D）Teleport（瞬移）")
-    kb_agent.qa_llm.clear_memory()
-    answer = kb_agent.chat("如果你在某回合用 bonus action（奖励动作）施放了一个法术，你还能在同一回合再施放一个非戏法（cantrip）的法术吗？为什么？")
-    kb_agent.qa_llm.clear_memory()
-    answer = kb_agent.chat("简述短休息（Short Rest）与长休息（Long Rest）的主要区别与效果（至少包含各自持续时间与恢复内容）。")
-    kb_agent.qa_llm.clear_memory()
-    answer = kb_agent.chat("当一个目标处于 Grappled（被擒抱/缠住）状态时，会发生什么？列出该状态对目标的具体机械效果。")
+    # 凡人修仙传
+    result = kb_agent.chat("韩立是如何进入七玄门的？记名弟子初次考验包含哪些关键路段与环节？")
+    print("query: \n", kb_agent.get_last_state().get("query"))
+    print("answer: \n", kb_agent.get_last_state().get("qa_answer", "无答案"))
+    print("fragments: \n", kb_agent.get_last_state().get("document_fragments", "无文档片段"))
+    print("mode: \n", kb_agent.get_last_state().get("mode"))
+    print("error: \n", kb_agent.get_last_state().get("error", "无错误"))
     kb_agent.qa_llm.clear_memory()
 
-    print(answer)
+    result = kb_agent.chat("墨大夫的真实来历与核心目的是什么？他与韩立关系的转折点发生在哪些事件上？")
+    print("query: \n", kb_agent.get_last_state().get("query"))
+    print("answer: \n", kb_agent.get_last_state().get("qa_answer", "无答案"))
+    print("fragments: \n", kb_agent.get_last_state().get("document_fragments", "无文档片段"))
+    kb_agent.qa_llm.clear_memory()
+
+    result = kb_agent.chat("神手谷中的神秘小瓶具备什么规律与用途？韩立如何验证并应用？")
+    print("query: \n", kb_agent.get_last_state().get("query"))
+    print("answer: \n", kb_agent.get_last_state().get("qa_answer", "无答案"))
+    print("fragments: \n", kb_agent.get_last_state().get("document_fragments", "无文档片段"))
+    kb_agent.qa_llm.clear_memory()
+
+    result = kb_agent.chat("落日峰死契血斗前后的关键人物与转折是什么？韩立如何扭转战局？")    
+    print("query: \n", kb_agent.get_last_state().get("query"))
+    print("answer: \n", kb_agent.get_last_state().get("qa_answer", "无答案"))
+    print("fragments: \n", kb_agent.get_last_state().get("document_fragments", "无文档片段"))
+    kb_agent.qa_llm.clear_memory()
+
+    result = kb_agent.chat("韩立已系统掌握的法术与其局限是什么？他如何法武并用？")
+    print("query: \n", kb_agent.get_last_state().get("query"))
+    print("answer: \n", kb_agent.get_last_state().get("qa_answer", "无答案"))
+    print("fragments: \n", kb_agent.get_last_state().get("document_fragments", "无文档片段"))
+    kb_agent.qa_llm.clear_memory()
+    
+    # 操作文档
+    result = kb_agent.chat("人类（Human）的标准种族特性里，能力值（Ability Scores）如何改变？人类还会获得哪些语言？")
+    print("query: \n", kb_agent.get_last_state().get("query"))
+    print("answer: \n", kb_agent.get_last_state().get("qa_answer", "无答案"))
+    print("fragments: \n", kb_agent.get_last_state().get("document_fragments", "无文档片段"))
+    kb_agent.qa_llm.clear_memory()
+    
+    result = kb_agent.chat("在战斗中当你使用一次动作（Action）时，下面哪项不是标准动作？（A）Dash（冲刺） （B）Disengage（脱离） （C）Dodge（躲闪） （D）Teleport（瞬移）")
+    print("query: \n", kb_agent.get_last_state().get("query"))
+    print("answer: \n", kb_agent.get_last_state().get("qa_answer", "无答案"))
+    print("fragments: \n", kb_agent.get_last_state().get("document_fragments", "无文档片段"))
+    kb_agent.qa_llm.clear_memory()
+    
+    result = kb_agent.chat("如果你在某回合用 bonus action（奖励动作）施放了一个法术，你还能在同一回合再施放一个非戏法（cantrip）的法术吗？为什么？")
+    print("query: \n", kb_agent.get_last_state().get("query"))
+    print("answer: \n", kb_agent.get_last_state().get("qa_answer", "无答案"))
+    print("fragments: \n", kb_agent.get_last_state().get("document_fragments", "无文档片段"))
+    kb_agent.qa_llm.clear_memory()
+    
+    result = kb_agent.chat("简述短休息（Short Rest）与长休息（Long Rest）的主要区别与效果（至少包含各自持续时间与恢复内容）。")
+    print("query: \n", kb_agent.get_last_state().get("query"))
+    print("answer: \n", kb_agent.get_last_state().get("qa_answer", "无答案"))
+    print("fragments: \n", kb_agent.get_last_state().get("document_fragments", "无文档片段"))
+    kb_agent.qa_llm.clear_memory()
+    
+    result = kb_agent.chat("当一个目标处于 Grappled（被擒抱/缠住）状态时，会发生什么？列出该状态对目标的具体机械效果。")
+    print("query: \n", kb_agent.get_last_state().get("query"))
+    print("answer: \n", kb_agent.get_last_state().get("qa_answer", "无答案"))
+    print("fragments: \n", kb_agent.get_last_state().get("document_fragments", "无文档片段"))
+    kb_agent.qa_llm.clear_memory()

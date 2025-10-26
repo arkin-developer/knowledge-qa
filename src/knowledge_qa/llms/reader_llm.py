@@ -31,12 +31,12 @@ class DocumentFragment(BaseModel):
 class SearchKeywordToolInput(BaseModel):
     keyword: str = Field(..., description="关键词")
     filename: str = Field(..., description="文件名")
-    limit: int = Field(default=300, description="最大返回结果数")
+    limit: int = Field(default=30, description="最大返回结果数")
     
     @classmethod
     def get_example_format(cls) -> str:
         """获取参数格式示例"""
-        return '{"keyword": "关键词", "filename": "文件名", "limit": 300}'
+        return '{"keyword": "关键词", "filename": "文件名", "limit": 100}'
     
     @classmethod
     def get_schema_dict(cls) -> dict:
@@ -44,7 +44,7 @@ class SearchKeywordToolInput(BaseModel):
         return {
             "keyword": "关键词 (必填)",
             "filename": "文件名 (必填)", 
-            "limit": "最大返回结果数 (可选，默认300)"
+            "limit": "最大返回结果数 (可选，默认100)"
         }
 
 class ReadFileContentToolInput(BaseModel):
@@ -119,7 +119,7 @@ class ReaderLLM:
         self.agent_executor = AgentExecutor(
             agent=self.agent,
             tools=self.tools,
-            verbose=True,
+            verbose=False,
             handle_parsing_errors=True,
             callbacks=[self.agent_callback],
             max_iterations=10,
@@ -138,8 +138,11 @@ Answer the following questions as best you can. You have access to the following
 - list_files_tool_func(): List all available files, no parameters needed
 - search_keyword_tool_func(keyword, filename, limit=300): Search for keywords in files and return relevant lines with context
   Purpose: Find specific content related to keywords, returns line numbers and surrounding context
-  Parameters: keyword (search term), filename (file name), limit (max results, default 300)
+  Parameters: keyword (search term - can be multiple keywords separated by spaces), filename (file name), limit (max results, default 300)
   Use this when: You need to find specific information or content within a file
+  Multiple keywords: Use spaces or commas to separate multiple keywords
+    Examples: "韩立 七玄门", "法术 修炼", "墨大夫 来历", "死契 血斗", "Grappled 状态"
+    The function will find lines containing ANY of these keywords (OR logic)
 - read_file_content_tool_func(filename, start_line, end_line): Read file content by line range
   Purpose: Get detailed content from specific line ranges, useful after finding relevant lines with search
   Parameters: filename (file name), start_line (start line number), end_line (end line number)
@@ -165,10 +168,17 @@ Answer the following questions as best you can. You have access to the following
 
 **Workflow Guidelines:**
 1. First, use list_files_tool_func() to see available files
-2. Then use search_keyword_tool_func() to find relevant content
-3. If you need more context, use read_file_content_tool_func() to read specific line ranges
+2. Use search_keyword_tool_func() to find relevant content (returns lines containing keywords)
+3. **EVALUATE CONTENT**: After finding relevant lines, check if the keyword-containing lines provide enough context:
+   - **If context is sufficient**: Directly use add_fragment_meta_tool_func() to save the relevant fragments
+   - **If context is insufficient**: Use read_file_content_tool_func() to get surrounding lines for more context
 4. **CRITICAL**: Use add_fragment_meta_tool_func() to save ALL relevant fragments you find (this is your PRIMARY GOAL)
 5. Always provide a complete answer based on the information you gather
+
+**Key Understanding**: 
+- search_keyword_tool_func() returns **complete lines** that contain the keywords
+- read_file_content_tool_func() returns **surrounding context** around specific line ranges
+- Only use read_file_content_tool_func() when the keyword-containing lines lack sufficient context to answer the question fully
 
 Use the following format:
 
@@ -183,7 +193,12 @@ Final Answer: the final answer to the original input question
 
 **Important Notes:**
 - **YOUR MAIN OBJECTIVE**: Find and save ALL relevant document fragments using add_fragment_meta_tool_func
-- After using search_keyword_tool_func, if you find relevant content, you can use read_file_content_tool_func to get more context
+- **SMART CONTEXT STRATEGY**: After finding relevant content with search_keyword_tool_func:
+  * **Understand the difference**: search_keyword_tool_func() returns complete lines containing keywords, read_file_content_tool_func() returns surrounding context
+  * **Evaluate first**: Check if the keyword-containing lines provide enough context to answer the question
+  * **If sufficient**: Save the fragments directly using add_fragment_meta_tool_func()
+  * **If insufficient**: Use read_file_content_tool_func() to get surrounding lines for more context
+  * **Be strategic**: Only read file content when the keyword-containing lines lack sufficient context
 - **MANDATORY**: Use add_fragment_meta_tool_func to save important fragments you discover (supports both single and multiple fragments)
 - You can call add_fragment_meta_tool_func multiple times throughout your search process
 - **PRIORITY**: Saving relevant fragments is more important than just answering the question
@@ -287,14 +302,16 @@ Thought:{agent_scratchpad}
                 relevant_lines = []
                 for i, line in enumerate(lines, 1):
                     if any(keyword.lower() in line.lower() for keyword in keywords):
+                        # 扩大上下文范围，增加匹配概率
+                        # content = lines[i-1].strip() + line.strip() + lines[i+1].strip() 
                         relevant_lines.append({
                             "line_number": i,
-                            "content": line.strip()
+                            "content": line.strip()  
                         })
                 if limit is None:
-                    limit = 300  # 默认值
-                if limit > 300:
-                    limit = 300
+                    limit = 30  # 默认值
+                if limit > 150:
+                    limit = 150
                 if len(relevant_lines) > limit:
                     relevant_lines = self._smart_sample_lines(relevant_lines, limit)
                 result = {
