@@ -398,7 +398,7 @@ Thought:{agent_scratchpad}
         return keywords
 
     def _smart_sample_lines(self, relevant_lines: List[Dict], limit: int) -> List[Dict]:
-        """智能采样相关行，确保覆盖全文的不同部分"""
+        """智能采样相关行，优先选择包含多个关键词的重要行"""
         if len(relevant_lines) <= limit:
             return relevant_lines
         
@@ -409,21 +409,23 @@ Thought:{agent_scratchpad}
         if total_lines <= limit:
             return sorted_lines
         
-        # 计算采样间隔，确保覆盖全文
-        step = total_lines / limit
+        # 计算每行的重要性分数（基于关键词密度和内容长度）
+        def calculate_importance(line_info):
+            content = line_info['content'].lower()
+            # 计算关键词密度
+            keyword_count = sum(1 for keyword in ['bonus action', 'spellcasting', 'cantrip', 'casting time', 'same turn'] 
+                              if keyword in content)
+            # 计算内容长度（避免过短的行）
+            content_length = len(content)
+            # 综合分数：关键词密度 + 内容长度权重
+            return keyword_count * 10 + min(content_length / 10, 5)
         
-        sampled_lines = []
-        for i in range(limit):
-            # 计算采样位置，确保均匀分布
-            index = int(i * step)
-            if index < total_lines:
-                sampled_lines.append(sorted_lines[index])
+        # 按重要性排序
+        scored_lines = [(line, calculate_importance(line)) for line in sorted_lines]
+        scored_lines.sort(key=lambda x: x[1], reverse=True)
         
-        # 确保包含开头和结尾的重要内容
-        if sorted_lines[0] not in sampled_lines:
-            sampled_lines[0] = sorted_lines[0]
-        if sorted_lines[-1] not in sampled_lines:
-            sampled_lines[-1] = sorted_lines[-1]
+        # 选择前limit个最重要的行
+        sampled_lines = [line for line, score in scored_lines[:limit]]
         
         # 按行号重新排序
         return sorted(sampled_lines, key=lambda x: x['line_number'])
