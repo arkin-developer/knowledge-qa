@@ -138,11 +138,17 @@ Answer the following questions as best you can. You have access to the following
 - list_files_tool_func(): List all available files, no parameters needed
 - search_keyword_tool_func(keyword, filename, limit=300): Search for keywords in files and return relevant lines with context
   Purpose: Find specific content related to keywords, returns line numbers and surrounding context
-  Parameters: keyword (search term - can be multiple keywords separated by spaces), filename (file name), limit (max results, default 300)
+  Parameters: keyword (search term - can be multiple keywords), filename (file name), limit (max results, default 300)
   Use this when: You need to find specific information or content within a file
-  Multiple keywords: Use spaces or commas to separate multiple keywords
-    Examples: "韩立 七玄门", "法术 修炼", "墨大夫 来历", "死契 血斗", "Grappled 状态"
-    The function will find lines containing ANY of these keywords (OR logic)
+  
+  **KEYWORD SEPARATION RULES:**
+  - **Chinese keywords**: Use spaces to separate multiple keywords
+    Examples: "韩立 七玄门", "法术 修炼", "墨大夫 来历", "死契 血斗"
+  - **English keywords**: Use COMMAS to separate multiple keywords (preserves phrases)
+    Examples: "bonus action, spellcasting", "casting time, cantrip", "Grappled, status"
+    Examples: "bonus action spell", "spellcasting rules" (single phrases)
+  
+  The function will find lines containing ANY of these keywords (OR logic)
 - read_file_content_tool_func(filename, start_line, end_line): Read file content by line range
   Purpose: Get detailed content from specific line ranges, useful after finding relevant lines with search
   Parameters: filename (file name), start_line (start line number), end_line (end line number)
@@ -199,6 +205,11 @@ Final Answer: the final answer to the original input question
   * **If sufficient**: Save the fragments directly using add_fragment_meta_tool_func()
   * **If insufficient**: Use read_file_content_tool_func() to get surrounding lines for more context
   * **Be strategic**: Only read file content when the keyword-containing lines lack sufficient context
+- **SEARCH STRATEGY**:
+  * **English keywords**: Use commas to separate multiple keywords (e.g., "bonus action, spellcasting", "casting time, cantrip")
+  * **Chinese keywords**: Use spaces to separate multiple keywords (e.g., "韩立 七玄门", "法术 修炼")
+  * **Mixed language**: Use appropriate separator for each language (e.g., "bonus action, 奖励动作")
+  * **Single phrases**: Keep as one unit (e.g., "bonus action spell", "spellcasting rules")
 - **MANDATORY**: Use add_fragment_meta_tool_func to save important fragments you discover (supports both single and multiple fragments)
 - You can call add_fragment_meta_tool_func multiple times throughout your search process
 - **PRIORITY**: Saving relevant fragments is more important than just answering the question
@@ -283,8 +294,8 @@ Thought:{agent_scratchpad}
                 return f"输入参数有误，请参考格式: {SearchKeywordToolInput.get_example_format()}，重新检查后重试。"
 
             try:
-                # keyword 切分, 这里用正则表达式切分，空格，逗号常见的分隔符
-                keywords = re.split(r'[,\s]+', keyword)
+                # 智能关键词分割：根据语言特点选择分割方式
+                keywords = self._split_keywords(keyword)
 
                 file_path = os.path.join(self.upload_path, filename)
                 if not os.path.exists(file_path):
@@ -362,10 +373,32 @@ Thought:{agent_scratchpad}
         
         return json_str
 
+    def _split_keywords(self, keyword_str: str) -> List[str]:
+        """智能分割关键词，根据语言特点选择分割方式"""
+        if not keyword_str:
+            return []
+        
+        # 检测是否包含中文字符
+        has_chinese = bool(re.search(r'[\u4e00-\u9fff]', keyword_str))
+        
+        if has_chinese:
+            # 中文：使用空格和逗号分割
+            keywords = re.split(r'[,\s]+', keyword_str)
+        else:
+            # 英文：优先使用逗号分割，如果没有逗号则使用空格
+            if ',' in keyword_str:
+                keywords = [k.strip() for k in keyword_str.split(',') if k.strip()]
+            else:
+                # 对于英文，保持短语完整性，只在明显分隔处分割
+                keywords = re.split(r'\s+', keyword_str)
+        
+        # 过滤空字符串
+        keywords = [k.strip() for k in keywords if k.strip()]
+        
+        return keywords
+
     def _smart_sample_lines(self, relevant_lines: List[Dict], limit: int) -> List[Dict]:
         """智能采样相关行，确保覆盖全文的不同部分"""
-        if limit is None:
-            limit = 300  # 默认值
         if len(relevant_lines) <= limit:
             return relevant_lines
         
