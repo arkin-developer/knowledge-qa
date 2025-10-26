@@ -1,4 +1,4 @@
-"""阅读本地文件资料的工具模型"""
+"""阅读本地文件资料的工具智能体"""
 
 import os 
 import json
@@ -49,21 +49,21 @@ class SearchKeywordToolInput(BaseModel):
 
 class ReadFileContentToolInput(BaseModel):
     filename: str = Field(..., description="文件名")
-    start_index: int = Field(..., description="起始行号")
-    end_index: int = Field(..., description="结束行号")
+    start_line: int = Field(..., description="起始行号")
+    end_line: int = Field(..., description="结束行号")
     
     @classmethod
     def get_example_format(cls) -> str:
         """获取参数格式示例"""
-        return '{"filename": "文件名", "start_index": 1, "end_index": 10}'
+        return '{"filename": "文件名", "start_line": 1, "end_line": 10}'
     
     @classmethod
     def get_schema_dict(cls) -> dict:
         """获取参数格式的字典表示"""
         return {
             "filename": "文件名 (必填)",
-            "start_index": "起始行号 (必填)",
-            "end_index": "结束行号 (必填)"
+            "start_line": "起始行号 (必填)",
+            "end_line": "结束行号 (必填)"
         }
 
 class AddFragmentMetaToolInput(BaseModel):
@@ -86,7 +86,7 @@ class AddFragmentMetaToolInput(BaseModel):
         }
 
 class ReaderLLM:
-    """阅读本地文件资料的工具模型"""
+    """阅读本地文件资料的工具智能体"""
 
     def __init__(self):
         self.upload_path = settings.upload_temp_path
@@ -123,7 +123,7 @@ class ReaderLLM:
             handle_parsing_errors=True,
             callbacks=[self.agent_callback],
             max_iterations=10,
-            early_stopping_method="generate"
+            early_stopping_method="force"
         )
         log.info("Agent 和 AgentExecutor 创建完成")
     
@@ -140,9 +140,9 @@ Answer the following questions as best you can. You have access to the following
   Purpose: Find specific content related to keywords, returns line numbers and surrounding context
   Parameters: keyword (search term), filename (file name), limit (max results, default 300)
   Use this when: You need to find specific information or content within a file
-- read_file_content_tool_func(filename, start_index, end_index): Read file content by line range
+- read_file_content_tool_func(filename, start_line, end_line): Read file content by line range
   Purpose: Get detailed content from specific line ranges, useful after finding relevant lines with search
-  Parameters: filename (file name), start_index (start line number), end_index (end line number)
+  Parameters: filename (file name), start_line (start line number), end_line (end line number)
   Use this when: You need to read more detailed content after finding relevant lines with search_keyword_tool_func
 - add_fragment_meta_tool_func(fragments): Add document fragment metadata to the system
   Purpose: Store relevant document fragments for future reference and context building
@@ -153,6 +153,15 @@ Answer the following questions as best you can. You have access to the following
   Format examples:
     Single fragment: {{"filename": "file.txt", "start_line": 10, "end_line": 20}}
     Multiple fragments: {{"fragments": [{{"filename": "file.txt", "start_line": 10, "end_line": 20}}, {{"filename": "file.txt", "start_line": 30, "end_line": 40}}]}}
+    
+  **CRITICAL JSON FORMAT REQUIREMENTS**:
+  - Use standard JSON format with proper punctuation
+  - Numbers (start_line, end_line) must NOT have quotes around them
+  - Use English punctuation only (no Chinese punctuation)
+  - Use single-line JSON format to avoid parsing errors
+  - Example: {{"filename": "file.txt", "start_line": 10, "end_line": 20}} ✅
+  - Wrong: {{"filename": "file.txt", "start_line": "10", "end_line": "20"}} ❌ (numbers should not have quotes)
+  - Wrong: {{"filename": "Player's Handbook.md", "start_line": 16845, "end_line": 16852"}} ❌ (extra quote after number)
 
 **Workflow Guidelines:**
 1. First, use list_files_tool_func() to see available files
@@ -211,9 +220,6 @@ Thought:{agent_scratchpad}
             self._read_file_content_tool(),
             self._add_fragment_meta_tool()
         ]
-        log.info(f"创建了 {len(tools)} 个工具")
-        for i, tool in enumerate(tools):
-            log.info(f"  工具 {i+1}: {tool.name}")
         return tools
 
     def _list_files_tool(self):
@@ -287,6 +293,8 @@ Thought:{agent_scratchpad}
                         })
                 if limit is None:
                     limit = 300  # 默认值
+                if limit > 300:
+                    limit = 300
                 if len(relevant_lines) > limit:
                     relevant_lines = self._smart_sample_lines(relevant_lines, limit)
                 result = {
@@ -300,6 +308,42 @@ Thought:{agent_scratchpad}
                 log.error(f"搜索关键词失败: {e}")
                 return f"搜索关键词失败: {e}"
         return search_keyword_tool_func
+
+    def _fix_json_format(self, json_str: str) -> str:
+        """修复JSON格式问题"""
+        # 移除尾随逗号
+        fixed_input = re.sub(r',\s*}', '}', json_str)
+        fixed_input = re.sub(r',\s*]', ']', fixed_input)
+        
+        # 移除换行符和制表符
+        fixed_input = re.sub(r'\n\s*', '', fixed_input)
+        fixed_input = re.sub(r'\t', ' ', fixed_input)
+        
+        # 修复不闭合的双引号问题
+        fixed_input = re.sub(r'(\d+)"\s*}', r'\1}', fixed_input)
+        fixed_input = re.sub(r'(\d+)"\s*]', r'\1]', fixed_input)
+        fixed_input = re.sub(r'(\d+)"\s*,', r'\1,', fixed_input)
+        
+        # 修复不匹配的括号
+        fixed_input = self._fix_unmatched_brackets(fixed_input)
+        
+        return fixed_input.strip()
+    
+    def _fix_unmatched_brackets(self, json_str: str) -> str:
+        """修复不匹配的括号"""
+        # 统计括号数量
+        open_braces = json_str.count('{')
+        close_braces = json_str.count('}')
+        open_brackets = json_str.count('[')
+        close_brackets = json_str.count(']')
+        
+        # 修复缺失的闭合括号
+        if open_braces > close_braces:
+            json_str += '}' * (open_braces - close_braces)
+        if open_brackets > close_brackets:
+            json_str += ']' * (open_brackets - close_brackets)
+        
+        return json_str
 
     def _smart_sample_lines(self, relevant_lines: List[Dict], limit: int) -> List[Dict]:
         """智能采样相关行，确保覆盖全文的不同部分"""
@@ -339,35 +383,34 @@ Thought:{agent_scratchpad}
         # 参数解析
         try:
             if isinstance(input, str):
-                # 清理输入字符串，移除可能的不可见字符
-                cleaned_input = input.strip()
-                input = json.loads(cleaned_input)
-                filename = input.get("filename")
+                # 尝试解析JSON，失败则修复格式后重试
+                try:
+                    parsed_input = json.loads(input.strip())
+                except json.JSONDecodeError:
+                    # 修复JSON格式问题
+                    fixed_input = self._fix_json_format(input)
+                    parsed_input = json.loads(fixed_input)
+                
+                filename = parsed_input.get("filename")
                 # 兼容 start_line/end_line 和 start_index/end_index
-                start_index = input.get("start_index") or input.get("start_line")
-                end_index = input.get("end_index") or input.get("end_line")
+                start_line = parsed_input.get("start_line") or parsed_input.get("start_index")
+                end_line = parsed_input.get("end_line") or parsed_input.get("end_index")
             elif isinstance(input, dict):
                 filename = input.get("filename")
                 # 兼容 start_line/end_line 和 start_index/end_index
-                start_index = input.get("start_index") or input.get("start_line")
-                end_index = input.get("end_index") or input.get("end_line")
-            else:
-                filename = input.filename
-                # 兼容 start_line/end_line 和 start_index/end_index
-                start_index = getattr(input, 'start_index', None) or getattr(input, 'start_line', None)
-                end_index = getattr(input, 'end_index', None) or getattr(input, 'end_line', None)
+                start_line = input.get("start_line") or input.get("start_index")
+                end_line = input.get("end_line") or input.get("end_index")
+                
         except Exception as e:
             log.error(f"读取文件内容失败: {e}")
-            log.error(f"输入参数: {repr(input)}")
-            log.error(f"输入类型: {type(input)}")
             return f"输入参数有误，请参考格式: {ReadFileContentToolInput.get_example_format()}，重新检查后重试。"
-        if not filename or not start_index or not end_index:
+        if not filename or not start_line or not end_line:
             return f"输入参数有误，文件名、起始行号和结束行号不能为空，请参考格式: {ReadFileContentToolInput.get_example_format()}，重新检查后重试。"
-        if start_index > end_index:
+        if start_line > end_line:
             return f"输入参数有误，起始行号不能大于结束行号，请参考格式: {ReadFileContentToolInput.get_example_format()}，重新检查后重试。"
-        if start_index < 1:
+        if start_line < 1:
             return f"输入参数有误，起始行号不能小于1，请参考格式: {ReadFileContentToolInput.get_example_format()}，重新检查后重试。"
-        if end_index < 1:
+        if end_line < 1:
             return f"输入参数有误，结束行号不能小于1，请参考格式: {ReadFileContentToolInput.get_example_format()}，重新检查后重试。"
 
         try:
@@ -382,9 +425,12 @@ Thought:{agent_scratchpad}
                     break
                 except UnicodeDecodeError:
                     return f"无法读取文件 {filename}，编码不支持"
+            
             lines = content.split('\n')
-            return json.dumps({"content": lines[start_index:end_index]}, ensure_ascii=False, indent=2)
-            log.info(f"读取文件 {filename} 内容，返回第 {start_index} 行到第 {end_index} 行")
+            if end_line - start_line > 50:
+                end_line = start_line + 50
+            selected_lines = lines[start_line-1:end_line]
+            return json.dumps({"content": selected_lines}, ensure_ascii=False, indent=2)
         except Exception as e:
             log.error(f"读取文件内容失败: {e}")
             return f"读取文件内容失败: {e}"
@@ -403,47 +449,39 @@ Thought:{agent_scratchpad}
         @tool
         def add_fragment_meta_tool_func(input: List[AddFragmentMetaToolInput] | AddFragmentMetaToolInput | str) -> str:
             """添加文档片段元数据"""
-            fragment_meta_list: List[DocumentFragmentMeta] = []
-            
-            # 参数解析
             try:
+                fragment_meta_list: List[DocumentFragmentMeta] = []
+                # 解析输入参数
                 if isinstance(input, str):
-                    # 解析JSON字符串
-                    parsed_input = json.loads(input)
+                    try:
+                        parsed_input = json.loads(input.strip())
+                    except json.JSONDecodeError:
+                        # 修复JSON格式问题
+                        fixed_input = self._fix_json_format(input)
+                        parsed_input = json.loads(fixed_input)
                     
-                    # 检查是否是fragments数组格式
+                    # 处理解析后的数据
                     if "fragments" in parsed_input and isinstance(parsed_input["fragments"], list):
-                        # 处理fragments数组格式
                         for item in parsed_input["fragments"]:
-                            filename = item.get("filename")
-                            start_line = item.get("start_line")
-                            end_line = item.get("end_line")
-                            if filename and start_line and end_line:
-                                fragment_meta_list.append(DocumentFragmentMeta(
-                                    filename=filename, 
-                                    start_line=start_line, 
-                                    end_line=end_line
-                                ))
-                    else:
-                        # 处理单个片段格式
-                        filename = parsed_input.get("filename")
-                        start_line = parsed_input.get("start_line")
-                        end_line = parsed_input.get("end_line")
-                        if filename and start_line and end_line:
                             fragment_meta_list.append(DocumentFragmentMeta(
-                                filename=filename, 
-                                start_line=start_line, 
-                                end_line=end_line
+                                filename=item.get("filename"), 
+                                start_line=item.get("start_line"), 
+                                end_line=item.get("end_line")
                             ))
+                    else:
+                        fragment_meta_list.append(DocumentFragmentMeta(
+                            filename=parsed_input.get("filename"), 
+                            start_line=parsed_input.get("start_line"), 
+                            end_line=parsed_input.get("end_line")
+                        ))
+                        
                 elif isinstance(input, AddFragmentMetaToolInput):
-                    # 处理Pydantic模型
                     fragment_meta_list.append(DocumentFragmentMeta(
                         filename=input.filename, 
                         start_line=input.start_line, 
                         end_line=input.end_line
                     ))
                 elif isinstance(input, list):
-                    # 处理列表格式
                     for item in input:
                         if isinstance(item, AddFragmentMetaToolInput):
                             fragment_meta_list.append(DocumentFragmentMeta(
@@ -457,26 +495,24 @@ Thought:{agent_scratchpad}
                                 start_line=item.get("start_line"), 
                                 end_line=item.get("end_line")
                             ))
+                
+                # 验证参数
+                for fragment in fragment_meta_list:
+                    if not fragment.filename or not fragment.start_line or not fragment.end_line:
+                        return f"输入参数有误，文件名、起始行号和结束行号不能为空，请参考格式: {AddFragmentMetaToolInput.get_example_format()}，重新检查后重试。"
+                    if fragment.start_line > fragment.end_line:
+                        return f"输入参数有误，起始行号不能大于结束行号，请参考格式: {AddFragmentMetaToolInput.get_example_format()}，重新检查后重试。"
+                    if fragment.start_line < 1 or fragment.end_line < 1:
+                        return f"输入参数有误，行号不能小于1，请参考格式: {AddFragmentMetaToolInput.get_example_format()}，重新检查后重试。"
+
+                # 保存片段
+                self.fragments_meta.extend(fragment_meta_list)
+                log.info(f"添加文档片段元数据成功: {len(fragment_meta_list)} 个片段")
+                return f"添加文档片段元数据成功，共保存 {len(fragment_meta_list)} 个片段"
+                
             except Exception as e:
                 log.error(f"添加文档片段元数据失败: {e}")
-                log.error(f"输入参数: {input}")
-                log.error(f"输入类型: {type(input)}")
                 return f"输入参数有误，请参考格式: {AddFragmentMetaToolInput.get_example_format()}，重新检查后重试。"
-            
-            # 验证参数
-            for fragment in fragment_meta_list:
-                if not fragment.filename or not fragment.start_line or not fragment.end_line:
-                    return f"输入参数有误，文件名、起始行号和结束行号不能为空，请参考格式: {AddFragmentMetaToolInput.get_example_format()}，重新检查后重试。"
-                if fragment.start_line > fragment.end_line:
-                    return f"输入参数有误，起始行号不能大于结束行号，请参考格式: {AddFragmentMetaToolInput.get_example_format()}，重新检查后重试。"
-                if fragment.start_line < 1:
-                    return f"输入参数有误，起始行号不能小于1，请参考格式: {AddFragmentMetaToolInput.get_example_format()}，重新检查后重试。"
-                if fragment.end_line < 1:
-                    return f"输入参数有误，结束行号不能小于1，请参考格式: {AddFragmentMetaToolInput.get_example_format()}，重新检查后重试。"
-
-            self.fragments_meta.extend(fragment_meta_list)
-            log.info(f"添加文档片段元数据成功: {len(fragment_meta_list)} 个片段")
-            return f"添加文档片段元数据成功，共保存 {len(fragment_meta_list)} 个片段"
         return add_fragment_meta_tool_func
 
     def clear_fragments_meta(self):
@@ -494,8 +530,8 @@ Thought:{agent_scratchpad}
             for fragment_meta in self.fragments_meta:
                 content = self.read_file_by_lines({
                     "filename": fragment_meta.filename,
-                    "start_index": fragment_meta.start_line,
-                    "end_index": fragment_meta.end_line
+                    "start_line": fragment_meta.start_line,
+                    "end_line": fragment_meta.end_line
                 })
                 if content:
                     self.fragments.append(DocumentFragment(
@@ -618,4 +654,5 @@ if __name__ == "__main__":
     print(result)
     print("=" * 50)
     print("文档片段元数据列表:")
-    print(reader_llm.fragments_meta)
+    reader_llm.update_fragments()
+    print(reader_llm.get_fragments())
