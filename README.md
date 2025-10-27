@@ -14,7 +14,7 @@
 
 - **框架**: LangGraph (工作流编排)
 - **向量数据库**: FAISS (向量存储与检索)
-- **大语言模型**: Qwen/Qwen3-VL-30B-A3B-Instruct
+- **大语言模型**: DeepSeek-V3 (通过SiliconCloud)
 - **嵌入模型**: Qwen/Qwen3-Embedding-8B
 - **Web 界面**: Streamlit
 - **命令行界面**: Rich
@@ -96,7 +96,7 @@ uv sync
    SILICONCLOUD_API_BASE=https://api.siliconflow.cn/v1
    
    # LLM 配置
-   LLM_MODEL=Qwen/Qwen3-VL-30B-A3B-Instruct
+   LLM_MODEL=deepseek-ai/DeepSeek-V3
    LLM_TEMPERATURE=0.7
    LLM_MAX_TOKENS=256000
    
@@ -158,6 +158,11 @@ CLI 功能菜单：
 - `0` - 退出程序
 - 直接输入问题 - 开始对话
 
+**新增功能**：
+- 支持本地文档直接阅读（无需上传到向量库）
+- 智能关键词搜索，支持中英文混合搜索
+- 自动文档片段提取和上下文扩展
+
 ### 2. Web 界面 (Streamlit)
 
 **方法一：使用启动脚本（推荐）**
@@ -191,16 +196,18 @@ knowledge-qa/
 │   ├── file_parser.py        # 文档解析器
 │   ├── llms/                 # LLM 模块目录
 │   │   ├── qa_llm.py         # 知识库问答大模型
-│   │   ├── reader_llm.py    # 文档阅读器模型
-│   │   ├── verify_llm.py    # 验证模型
-│   │   └── finished_llm.py  # 完成状态判断模型
+│   │   ├── reader_llm.py     # 文档阅读器模型
+│   │   ├── refine_llm.py     # 材料完善建议模型
+│   │   └── finished_llm.py   # 完成状态判断模型
 │   ├── log_manager.py        # 日志管理
 │   ├── memory.py             # 对话记忆管理
 │   ├── text_processor.py     # 文本处理与向量化
 │   └── vector_store.py       # 向量存储管理
 ├── examples/                 # 示例文档
 ├── data/                     # 数据存储目录
-│   └── faiss_db/            # FAISS 向量数据库
+│   ├── faiss_db/            # FAISS 向量数据库
+│   ├── upload/              # 用户上传文档目录
+│   └── chunks.db            # 文档分块数据库
 ├── logs/                     # 日志文件
 ├── start_cli.py             # CLI 启动脚本
 ├── start_web.py             # Web 启动脚本
