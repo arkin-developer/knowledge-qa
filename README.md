@@ -22,6 +22,8 @@
 - **包管理**: UV
 - **可观测性**: LangSmith
 
+![image-20251027130329257](https://mr-lai.oss-cn-zhangjiakou.aliyuncs.com/macminim4image-20251027130329257.png)
+
 ## 📦 安装与启动
 
 ### 环境要求
